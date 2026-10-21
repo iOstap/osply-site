@@ -1,0 +1,537 @@
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js"}}</script>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js" crossorigin>
+<link rel="preload" href="https://cdn.prod.website-files.com/672b64cf4007da092c519e05/6ac94f7679ff41d200ec11f8_sharp-mesh.png" as="fetch" crossorigin media="(orientation:landscape),(min-width:821px) and (hover:hover) and (pointer:fine)">
+<link rel="preload" href="https://cdn.prod.website-files.com/672b64cf4007da092c519e05/6aca0f1f30ad05481f41ca4d_ash-bake-0.webp" as="image" crossorigin media="(orientation:landscape),(min-width:821px) and (hover:hover) and (pointer:fine)">
+<link rel="preload" href="https://cdn.prod.website-files.com/672b64cf4007da092c519e05/6aca15665f21a498cf6ab454_ash-bake-1b.webp" as="image" crossorigin media="(orientation:landscape),(min-width:821px) and (hover:hover) and (pointer:fine)">
+<link rel="preload" href="https://cdn.prod.website-files.com/672b64cf4007da092c519e05/6aca0f1fea8c80b0695cd81c_ash-bake-2.webp" as="image" crossorigin media="(orientation:landscape),(min-width:821px) and (hover:hover) and (pointer:fine)">
+
+
+
+<script>
+// ------------- ABOUT: PAGE TRANSITION HOLD ------------- //
+
+(function () {
+  if (!window.osplyVT) return;
+  osplyVT.hold = true;
+  var titlePassed = false;
+  addEventListener('basalt3d:title', function (e) {
+    if (titlePassed) return;
+    if (!osplyVT.active) { osplyVT.go(); return; }
+    e.stopImmediatePropagation();
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      osplyVT.go();
+      setTimeout(function () { titlePassed = true; dispatchEvent(new Event('basalt3d:title')); }, osplyVT.delay * 1000);
+    }); });
+  });
+})();
+</script>
+
+
+
+<style>
+/* ------------- ABOUT ------------- */
+
+.basalt-hero{height:100vh;height:100svh;isolation:isolate}
+.basalt-hero_canvas{transition:none}
+.basalt-hero_canvas.is-ready{opacity:1}
+.basalt-hero_canvas canvas{position:absolute;inset:0;width:100%!important;height:100%!important;display:block}
+html.w-editor .basalt-hero_canvas{display:none}
+html:not(.w-editor) .hero-title{perspective:1000px;clip-path:inset(0 -50vw)}
+html:not(.w-editor) .hero-letter{overflow:visible;transform-style:preserve-3d}
+html:not(.w-editor) .hero-letter img{display:block;transform:translateY(100%) rotateX(60deg);will-change:transform;backface-visibility:hidden}
+html:not(.w-editor) .hero-top .nav:not(.is-open){height:0}
+.services-warp{position:relative;height:100vh;height:100svh;background:#0e0e0e}
+.services-warp_canvas{position:absolute;inset:0;pointer-events:none}
+.services-warp_canvas canvas{display:block;width:100%!important;height:100%!important}
+.services-warp_list{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.services-warp.is-fallback .services-warp_list{position:static;width:auto;height:100%;margin:0;clip:auto;display:flex;flex-direction:column;justify-content:center;align-items:center;list-style:none;color:#fff;font:500 clamp(2rem,7vw,7rem)/1 "Lay Grotesk",Arial,sans-serif;text-transform:uppercase;letter-spacing:-.05em}
+@media (min-width:821px) and (max-width:991px){.services-warp{height:70vh;height:70svh}}
+@media (min-width:668px) and (max-width:820px){.services-warp{height:80vh;height:80svh}}
+@media (orientation:portrait) and (max-width:820px),(orientation:portrait) and (hover:none) and (pointer:coarse){
+.basalt-hero_stage,.basalt-hero_canvas{display:none!important}
+.section-about{margin-top:-30svh}
+}
+html:not(.w-editor):not(.flip-shown) [data-flip-start]{visibility:hidden}
+html.flip-ready [data-flip-start] img:not([data-flip="front"]){opacity:0}
+[data-flip-track]>.section-about,[data-flip-track]>.section-services{z-index:auto}
+</style>
+
+
+
+<script>
+// ------------- ABOUT: HERO PARALLAX ------------- //
+
+document.addEventListener('DOMContentLoaded', function () {
+  if (document.documentElement.classList.contains('w-editor')) return;
+  var top = document.querySelector('.hero-top');
+  var about = document.querySelector('.section-about') || document.querySelector('.section-2');
+  if (!top || !about) return;
+  var portrait = matchMedia('(orientation:portrait) and (max-width:820px),(orientation:portrait) and (hover:none) and (pointer:coarse)');
+  function start() {
+    if (!portrait.matches) return 'top bottom';
+    var shift = Math.max(0, -parseFloat(getComputedStyle(about).marginTop) || 0);
+    return 'top ' + Math.max(0, innerHeight - shift) + 'px';
+  }
+  osply.gsap().then(function () {
+    gsap.fromTo(top, { yPercent: 0 }, { yPercent: -75, ease: 'none', scrollTrigger: { trigger: about, start: start, end: 'top top', scrub: 1, invalidateOnRefresh: true } });
+  });
+});
+</script>
+
+
+
+<script type="module">
+// ------------- ABOUT: SERVICES WARP ------------- //
+
+import * as THREE from 'three';
+(function () {
+  if (document.documentElement.classList.contains('w-editor')) return;
+  var ITEMS = ['Brand Identity', 'Digital Experiences', 'UI Design', '3D & Motion', 'Web Development', 'AI Integration'];
+  var LIST = ITEMS, GAP = .14, DIM = .1, TALL = .64, FONT = '"Lay Grotesk",Arial,sans-serif';
+  var sec = document.querySelector('.services-warp');
+  if (!sec) return;
+  sec.setAttribute('aria-label', 'Services');
+  sec.insertAdjacentHTML('afterbegin', '<ul class="services-warp_list">' + ITEMS.map(function (t) { return '<li>' + t.replace(/&/g, '&amp;') + '</li>'; }).join('') + '</ul><div class="services-warp_canvas" aria-hidden="true"></div>');
+  var host = sec.querySelector('.services-warp_canvas');
+  window.__warpActive = 0;
+  var renderer;
+  try { renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' }); }
+  catch (e) { sec.classList.add('is-fallback'); return; }
+  renderer.setClearColor(0x000000, 0);
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  host.appendChild(renderer.domElement);
+  var W = 1, H = 1, DPR = 1, mobile = false, portrait = false, tall = false, loops = 1, F = 60, A = 80, P = 800, NE = .6, R = 300;
+  var scene = new THREE.Scene(), cam = new THREE.OrthographicCamera(-1, 1, 1, -1, -10, 10), rt = new THREE.WebGLRenderTarget(2, 2), geo = new THREE.PlaneGeometry(1, 1), tex = {}, meshes = [];
+  function setFont(x, px) { x.font = '500 ' + px + 'px ' + FONT; try { x.letterSpacing = (-.05 * px) + 'px'; } catch (e) {} }
+  function makeLabel(text) {
+    var c = document.createElement('canvas'), x = c.getContext('2d'), px = Math.round(F * DPR), str = text.toUpperCase();
+    setFont(x, px);
+    var w = Math.ceil(x.measureText(str).width + px * .3), h = Math.ceil(px * 1.2);
+    c.width = w; c.height = h; setFont(x, px);
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(str, w / 2, h / 2 + px * .04);
+    var t = new THREE.CanvasTexture(c); t.anisotropy = 4; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.userData = { w: w / DPR, h: h / DPR };
+    return t;
+  }
+  function buildLabels() {
+    Object.keys(tex).forEach(function (k) { tex[k].dispose(); }); tex = {};
+    ITEMS.forEach(function (t) { tex[t] = makeLabel(t); });
+    while (meshes.length < LIST.length) { var m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false })); meshes.push(m); scene.add(m); }
+    while (meshes.length > LIST.length) { var r = meshes.pop(); scene.remove(r); r.material.dispose(); }
+    meshes.forEach(function (m, i) { var t = tex[LIST[i]]; m.material.map = t; m.material.needsUpdate = true; m.scale.set(t.userData.w, t.userData.h, 1); });
+  }
+  var post = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+    uniforms: { tMap: { value: rt.texture }, uD: { value: -.9 }, uD2: { value: -.6 }, uBg: { value: new THREE.Vector3(14 / 255, 14 / 255, 14 / 255) }, uEdgeFade: { value: 0 } },
+    vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
+    fragmentShader: 'uniform sampler2D tMap;uniform float uD;uniform float uD2;uniform vec3 uBg;uniform float uEdgeFade;varying vec2 vUv;void main(){vec2 c=vUv-.5;float r2=dot(c,c);c*=1.+uD*r2+uD2*r2*r2;vec4 t=texture2D(tMap,c+.5);float e=1.;if(uEdgeFade>0.){e=smoothstep(0.,uEdgeFade,vUv.y)*smoothstep(0.,uEdgeFade,1.-vUv.y);}float a=t.a*e;gl_FragColor=vec4(uBg*(1.-a)+t.rgb*e,1.);}',
+    depthTest: false, depthWrite: false
+  }));
+  var postScene = new THREE.Scene(), postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  postScene.add(post);
+  function capHeight() { var x = document.createElement('canvas').getContext('2d'); x.font = '500 100px ' + FONT; return (x.measureText('H').actualBoundingBoxAscent || 70) / 100; }
+  function widest() { var x = document.createElement('canvas').getContext('2d'), m = 0; setFont(x, 100); ITEMS.forEach(function (t) { m = Math.max(m, x.measureText(t.toUpperCase()).width); }); return m / 100 || 10; }
+  var state = { p: 0 }, drawn = -1, dirty = true, visible = false;
+  function layout() {
+    W = sec.clientWidth || innerWidth; H = sec.clientHeight || innerHeight;
+    portrait = H > W; mobile = W < 768 || portrait; tall = !mobile && H / W > TALL;
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    F = portrait ? W * .085 : mobile ? W * .12 : Math.min(W * .09, H * .13);
+    F = Math.min(F, W * (portrait ? .76 : mobile ? .68 : .62) / widest());
+    A = F * (capHeight() + (portrait ? .32 : GAP));
+    if (mobile || tall) {
+      loops = Math.max(3, Math.ceil(H * (tall ? 1.1 : .7) / (A * ITEMS.length)));
+      LIST = []; for (var i = 0; i < loops; i++) LIST = LIST.concat(ITEMS);
+    } else { loops = 1; LIST = ITEMS; }
+    P = A * LIST.length; NE = (portrait ? 1.15 : 1) / loops; R = A * 3;
+    post.material.uniforms.uD.value = mobile ? -.75 : -.9;
+    post.material.uniforms.uEdgeFade.value = portrait ? .12 : 0;
+    renderer.setPixelRatio(DPR); renderer.setSize(W, H, false); rt.setSize(Math.round(W * DPR), Math.round(H * DPR));
+    cam.left = -W / 2; cam.right = W / 2; cam.top = H / 2; cam.bottom = -H / 2; cam.updateProjectionMatrix();
+    buildLabels(); dirty = true;
+  }
+  function render() {
+    if (!visible || (!dirty && drawn === state.p)) return;
+    drawn = state.p; dirty = false;
+    var best = 0, bestD = 1e9;
+    meshes.forEach(function (m, i) {
+      var re = -i * A + (state.p - .25) * P * NE;
+      re = (((re + P / 2) % P) + P) % P - P / 2;
+      m.position.y = re;
+      var d = Math.abs(re); if (d < bestD) { bestD = d; best = i; }
+      var a = Math.pow(Math.max(0, 1 - d / R), 3), e = Math.min(1, Math.max(0, (P / 2 - d) / A));
+      m.material.opacity = (DIM + (1 - DIM) * a) * e * e * (3 - 2 * e);
+    });
+    window.__warpActive = best % ITEMS.length;
+    renderer.setRenderTarget(rt); renderer.render(scene, cam);
+    renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+  }
+  new IntersectionObserver(function (e) { visible = e[0].isIntersecting; if (visible) { dirty = true; render(); } }, { rootMargin: '100px 0px' }).observe(sec);
+  var rz;
+  addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { if (sec.clientWidth !== W || sec.clientHeight !== H) layout(); }, 150); });
+  layout();
+  if (document.fonts && document.fonts.load) document.fonts.load('500 64px "Lay Grotesk"').then(layout, function () {});
+  osply.gsap().then(function () {
+    gsap.fromTo(state, { p: 0 }, { p: 1, ease: 'none', scrollTrigger: { trigger: sec, start: 'top bottom', end: 'bottom top', scrub: .5 } });
+    gsap.ticker.add(render);
+    ScrollTrigger.refresh();
+  });
+  addEventListener('load', function () { if (window.ScrollTrigger) ScrollTrigger.refresh(); });
+})();
+</script>
+
+
+
+<script type="module">
+// ------------- ABOUT: FLIPPING CARD ------------- //
+
+import * as THREE from 'three';
+(function () {
+  var root = document.documentElement;
+  var track = root.classList.contains('w-editor') ? null : document.querySelector('[data-flip-track]');
+  function shown() { root.classList.add('flip-shown'); }
+  if (!track) { shown(); return; }
+  var ds = track.dataset;
+  var CFG = {
+    midX: .5, startAt: parseFloat(ds.flipStartAt) || .9, burnEnd: parseFloat(ds.flipBurnEnd) || .8, glitch: 1,
+    turn: 360, reveal: 2, revealDelay: .1, tilt: .3, bend: 1.3, maxVel: 2000, svgScale: 2, segments: 32, volume: .3
+  };
+  setTimeout(shown, 12000);
+  var titleAt = window.__basaltTitle ? performance.now() : -1;
+  addEventListener('basalt3d:title', function () { if (titleAt < 0) titleAt = performance.now(); }, { once: true });
+
+  function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function ease(t) { return .5 - .5 * Math.cos(Math.PI * clamp(t, 0, 1)); }
+
+  var actx = null, lastClick = 0;
+  function unlockAudio() {
+    try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) {}
+  }
+  function click(i) {
+    if (!actx || actx.state !== 'running') return;
+    var now = performance.now();
+    if (now - lastClick < 45) return;
+    lastClick = now;
+    var t = actx.currentTime, v = CFG.volume, f0 = 110 * Math.pow(1.07, (i || 0) % 6);
+    var out = actx.createBiquadFilter(); out.type = 'lowpass'; out.frequency.value = 900; out.Q.value = .5;
+    out.connect(actx.destination);
+    var o = actx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(f0 * 1.7, t); o.frequency.exponentialRampToValueAtTime(f0, t + .03);
+    var og = actx.createGain();
+    og.gain.setValueAtTime(.0001, t); og.gain.exponentialRampToValueAtTime(v, t + .004);
+    og.gain.exponentialRampToValueAtTime(.001, t + .09);
+    o.connect(og); og.connect(out);
+    o.start(t); o.stop(t + .1);
+    var len = Math.floor(actx.sampleRate * .02);
+    var buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+    for (var k = 0; k < len; k++) d[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / len, 4);
+    var n = actx.createBufferSource(); n.buffer = buf;
+    var bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 500 * Math.pow(1.07, (i || 0) % 6); bp.Q.value = .8;
+    var ng = actx.createGain(); ng.gain.setValueAtTime(v * .25, t); ng.gain.exponentialRampToValueAtTime(.001, t + .025);
+    n.connect(bp); bp.connect(ng); ng.connect(out);
+    n.start(t);
+  }
+
+  function makeTex(source, w, h, renderer) {
+    var t = new THREE.Texture(source);
+    t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.needsUpdate = true;
+    return { tex: t, w: w, h: h };
+  }
+  function loadImage(src, cors) {
+    return new Promise(function (res, rej) {
+      var im = new Image();
+      if (cors) im.crossOrigin = 'anonymous';
+      im.decoding = 'async'; im.onload = function () { res(im); }; im.onerror = rej; im.src = src;
+    });
+  }
+  function isSvg(src) { return /\.svg(\?|#|$)/i.test(src) || /^data:image\/svg/i.test(src); }
+  function loadSvgTexture(src, targetW, renderer) {
+    return fetch(src, { mode: 'cors' }).then(function (r) { return r.text(); }).then(function (txt) {
+      var svg = new DOMParser().parseFromString(txt, 'image/svg+xml').documentElement;
+      var vb = (svg.getAttribute('viewBox') || '').split(/[\s,]+/).map(parseFloat);
+      var iw = vb[2] || parseFloat(svg.getAttribute('width')) || 1000;
+      var ih = vb[3] || parseFloat(svg.getAttribute('height')) || 1000;
+      if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', '0 0 ' + iw + ' ' + ih);
+      var maxTex = Math.min(renderer.capabilities.maxTextureSize, 4096);
+      var W = Math.round(clamp(targetW, 256, maxTex)), H = Math.round(W * ih / iw);
+      if (H > maxTex) { W = Math.round(W * maxTex / H); H = maxTex; }
+      svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('preserveAspectRatio', 'none');
+      var url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }));
+      return loadImage(url, false).then(function (im) {
+        var c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        c.getContext('2d').drawImage(im, 0, 0, W, H);
+        URL.revokeObjectURL(url);
+        return makeTex(c, W, H, renderer);
+      });
+    });
+  }
+  function loadSrc(src, targetW, renderer) {
+    if (!src) return Promise.resolve(null);
+    if (isSvg(src)) return loadSvgTexture(src, targetW, renderer);
+    return loadImage(src, true).then(function (im) { return makeTex(im, im.naturalWidth, im.naturalHeight, renderer); });
+  }
+  function imgSrc(img) { return img ? (img.currentSrc || img.getAttribute('src')) : null; }
+
+  var VERT = [
+    'uniform vec2 uSize;uniform float uBendY;uniform float uBendX;uniform float uFlutter;uniform float uTime;',
+    'varying vec2 vUv;varying float vShade;',
+    'void main(){',
+    '  vUv = uv;',
+    '  vec3 p = position;',
+    '  float z = uBendY * p.y * p.y * 4.0 * uSize.y * 0.22 + uBendX * p.x * p.x * 4.0 * uSize.x * 0.22;',
+    '  z += sin(p.x * 5.0 + uTime * 2.6) * sin(p.y * 3.5 + uTime * 1.9) * uFlutter * uSize.x * 0.03;',
+    '  vShade = z / (max(uSize.x, uSize.y) * 0.22);',
+    '  p.z = z;',
+    '  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);',
+    '}'
+  ].join('\n');
+
+  var FRAG = [
+    'precision highp float;',
+    'uniform sampler2D uFront;uniform sampler2D uBack;uniform vec2 uSize;uniform vec2 uFrontRes;uniform vec2 uBackRes;',
+    'uniform float uReveal;uniform float uBurn;uniform float uGlitch;uniform float uTime;',
+    'varying vec2 vUv;varying float vShade;',
+    'float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }',
+    'float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }',
+    'float fbm(vec2 p){ float a=0.5, s=0.; for(int i=0;i<4;i++){ s+=a*vn(p); p=p*2.03+vec2(17.1,9.3); a*=0.5; } return s; }',
+    'vec2 cover(vec2 uv, vec2 s, vec2 i){ float r = max(s.x / i.x, s.y / i.y); vec2 n = i * r; return uv * s / n + (n - s) * 0.5 / n; }',
+    'vec3 spec(float t){ float lo = step(t, 0.5); float w = clamp(1.0 - abs(2.0 * clamp((t - 1.0 / 6.0) / (4.0 / 6.0), 0.0, 1.0) - 1.0), 0.0, 1.0);',
+    '  return pow(vec3(lo, 1.0, 1.0 - lo) * vec3(1.0 - w, w, 1.0 - w), vec3(1.0 / 2.2)); }',
+    'vec4 tex(vec2 uv){',
+    '  if (gl_FrontFacing) return texture2D(uFront, cover(uv, uSize, uFrontRes));',
+    '  return texture2D(uBack, cover(vec2(1.0 - uv.x, uv.y), uSize, uBackRes));',
+    '}',
+    'void main(){',
+    '  vec4 c = tex(vUv);',
+    '  float s = clamp(vShade, -1.0, 1.0);',
+    '  c.rgb *= 1.0 - abs(s) * 0.22;',
+    '  c.rgb += max(s, 0.0) * 0.05;',
+    '  if (uReveal < 1.0) {',
+    '    vec2 q = (vUv - 0.5) * 2.0; float d = max(abs(q.x), abs(q.y)); d = mix(d, length(q) * 0.7071, 0.55);',
+    '    vec2 np = vec2(vUv.x * uSize.x / uSize.y, vUv.y) * 3.5;',
+    '    float n = fbm(np + vec2(0.2, 0.13) * uTime + fbm(np * 0.7 - 0.1 * uTime) * 1.2);',
+    '    float f = d * 0.58 + n * 0.672;',
+    '    float aa = fwidth(f) * 1.2 + 0.002;',
+    '    c.a *= smoothstep(f - aa, f + aa, mix(0.0, 1.31, uReveal));',
+    '  }',
+    '  if (uBurn > 0.0) {',
+    '    vec2 np = vec2(vUv.x * uSize.x / uSize.y, vUv.y);',
+    '    float n1 = fbm(np * 3.2 + vec2(0.0, -uTime * 0.22));',
+    '    float n2 = vn(np * 24.0 + vec2(uTime * 0.4, -uTime * 2.2));',
+    '    float on = smoothstep(0.0, 0.035, uBurn);',
+    '    float d0 = vUv.y - mix(-0.22, 1.24, uBurn) + (n1 - 0.5) * 0.3 + (n2 - 0.5) * 0.04;',
+    '    float aa = fwidth(d0) * 1.5 + 0.0015;',
+    '    float band = (1.0 - smoothstep(0.0, 0.16, abs(d0))) * on * uGlitch;',
+    '    float fl = smoothstep(0.3, 0.7, vn(vec2(np.x * 3.0 + uTime * 0.35, uTime * 0.2)));',
+    '    vec2 dir = normalize(vec2((n1 - 0.5) * 1.2, 1.0)) * mix(-1.0, 1.0, fl);',
+    '    float amt = 0.04 * band;',
+    '    vec3 sum = vec3(0.0), sw = vec3(0.0), sa = vec3(0.0);',
+    '    for (int i = 0; i < 7; i++) {',
+    '      float k = float(i) / 6.0;',
+    '      vec3 w = spec(k);',
+    '      float o = (k - 0.5) * amt;',
+    '      vec4 t = tex(vUv + dir * o);',
+    '      float m = smoothstep(-aa, aa, d0 + dir.y * o) * t.a;',
+    '      sum += w * t.rgb * m; sa += w * m; sw += w;',
+    '    }',
+    '    vec3 pc = sum / sw, pa = sa / sw;',
+    '    float A = max(max(pa.r, pa.g), pa.b);',
+    '    vec3 rc = pc / max(A, 1e-4) * (1.0 - abs(s) * 0.22) + max(s, 0.0) * 0.05;',
+    '    float cut = smoothstep(-aa, aa, d0) * c.a;',
+    '    float useR = step(0.001, band);',
+    '    c.rgb = mix(c.rgb, rc, useR * smoothstep(0.0, 0.25, band));',
+    '    c.a = mix(mix(c.a, cut, on), A, useR * smoothstep(0.0, 0.25, band));',
+    '  }',
+    '  gl_FragColor = c;',
+    '}'
+  ].join('\n');
+
+  function init() {
+    var startEl = track.querySelector('[data-flip-start]');
+    var listEl = track.querySelector('[data-flip-services]');
+    var frontImg = track.querySelector('img[data-flip="front"]');
+    var backImg = track.querySelector('img[data-flip="back"]') || frontImg;
+    if (!startEl || !frontImg) return shown();
+
+    ['pointerdown', 'pointerup', 'click', 'touchend', 'keydown'].forEach(function (ev) { addEventListener(ev, unlockAudio, { passive: true, capture: true }); });
+
+    var canvas = document.createElement('canvas');
+    canvas.setAttribute('aria-hidden', 'true');
+    var centerMode = matchMedia('(hover: none) and (pointer: coarse)').matches;
+    if (getComputedStyle(track).position === 'static') track.style.position = 'relative';
+    canvas.style.cssText = (centerMode ? 'position:fixed;' : 'position:absolute;will-change:transform;') + 'left:0;top:0;pointer-events:none;z-index:1;';
+    track.appendChild(canvas);
+
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setClearColor(0x000000, 0);
+    var scene = new THREE.Scene(), DIST = 1500, camera = new THREE.PerspectiveCamera(45, 1, 10, 6000);
+    camera.position.z = DIST;
+
+    var vw = 0, vh = 0, TURN = Math.round(CFG.turn / 180) * Math.PI;
+    function resize() {
+      vw = innerWidth; vh = innerHeight;
+      renderer.setSize(vw, vh, false);
+      canvas.style.width = vw + 'px'; canvas.style.height = vh + 'px';
+      camera.aspect = vw / vh;
+      camera.fov = 2 * Math.atan(vh / 2 / DIST) * 180 / Math.PI;
+      camera.updateProjectionMatrix();
+    }
+    resize();
+
+    var uniforms = {
+      uFront: { value: null }, uBack: { value: null },
+      uFrontRes: { value: new THREE.Vector2(1, 1) }, uBackRes: { value: new THREE.Vector2(1, 1) },
+      uSize: { value: new THREE.Vector2(1, 1) },
+      uBendY: { value: 0 }, uBendX: { value: 0 }, uFlutter: { value: 0 }, uTime: { value: 0 },
+      uReveal: { value: 0 }, uBurn: { value: 0 }, uGlitch: { value: CFG.glitch }
+    };
+    var revT0 = -1, rev = 0, revArmed = titleAt >= 0;
+    function startReveal() { revArmed = true; }
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { rev = 1; shown(); }
+    else { addEventListener('basalt3d:title', startReveal, { once: true }); setTimeout(startReveal, 9000); }
+    var mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1, CFG.segments, CFG.segments),
+      new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: uniforms, side: THREE.DoubleSide, transparent: true, extensions: { derivatives: true } })
+    );
+    mesh.visible = false;
+    scene.add(mesh);
+
+    var domShown = 'init';
+    function showDom(which) {
+      if (which === domShown) return;
+      domShown = which;
+      frontImg.style.opacity = which === 'start' ? '' : '0';
+    }
+    var T = { front: null, back: null }, curFront = null, curBack = null, rowKey = null;
+    function setFront(t) { if (!t || t === curFront) return; curFront = t; uniforms.uFront.value = t.tex; uniforms.uFrontRes.value.set(t.w, t.h); }
+    function setBack(t) { if (!t || t === curBack) return; curBack = t; uniforms.uBack.value = t.tex; uniforms.uBackRes.value.set(t.w, t.h); }
+
+    function scrollPos() { return window.__scroller ? window.__scroller.scrollTop : window.scrollY; }
+    var lastY = scrollPos(), lastCx = null, vel = 0, bendY = 0, bendX = 0, flutter = 0, flight = 0, time = 0;
+    var idleY = null, idleAt = 0, drawnKey = '', cleared = false, burn = 0, lastPhase = 0;
+
+    function frame(t, dtMs) {
+      var dt = Math.max(dtMs, 1) / 1000, y0 = scrollPos();
+      var settled = Math.abs(bendY) < 1e-3 && Math.abs(bendX) < 1e-3 && flutter < 1e-3 && (rev >= 1 || (revT0 < 0 && !revArmed)) && !(burn > 0 && burn < 1 && lastPhase === 1);
+      if (y0 === idleY && settled && innerWidth === vw && innerHeight === vh && t - idleAt < 500) return;
+      if (y0 !== idleY || !settled || t - idleAt >= 500) idleAt = t;
+      idleY = y0;
+      time += dt;
+      if (rev < 1) {
+        if (revT0 < 0 && lastPhase !== 0) { rev = 1; shown(); }
+        else if (revT0 < 0 && revArmed) {
+          var sr = startEl.getBoundingClientRect();
+          if (sr.top < innerHeight * .92 && sr.bottom > 0) revT0 = performance.now() + CFG.revealDelay * 1000;
+        }
+        if (revT0 >= 0 && rev < 1) {
+          var rx = clamp((performance.now() - revT0) / (CFG.reveal * 1000), 0, 1);
+          rev = 1 - Math.pow(1 - rx, 3);
+          if (rx >= 1) { rev = 1; shown(); }
+        }
+      }
+      uniforms.uReveal.value = rev;
+
+      if (innerWidth !== vw || innerHeight !== vh) resize();
+      if (!vw || !vh) return;
+
+      var c = vh / 2;
+      if (!centerMode) {
+        var tr = track.getBoundingClientRect();
+        canvas.style.transform = 'translate3d(' + (-tr.left) + 'px,' + (-tr.top) + 'px,0)';
+      }
+      var s = startEl.getBoundingClientRect(), L = listEl ? listEl.getBoundingClientRect() : { top: s.bottom, bottom: s.bottom };
+      var midX = vw * CFG.midX, scx = s.left + s.width / 2, scy = s.top + s.height / 2;
+      var dT = centerMode ? scy - c : scy - vh * CFG.startAt;
+      var d1 = L.top - c, dM = (L.top + L.bottom) / 2 - c, dL = L.bottom - (c - s.height / 2);
+
+      var cx, cy, w = s.width, h = s.height, rotY = 0, turn = 0, leg = 0, phase;
+      var atStart = centerMode ? (y0 <= 1 || dT > (lastPhase === 0 ? -4 : -1)) : dT > 0;
+      if (atStart) { phase = 0; cx = scx; cy = scy; }
+      else if (dL <= 0) { phase = 4; cx = midX; cy = c; rotY = TURN; }
+      else if (centerMode) {
+        phase = 1;
+        cx = dM > 0 ? lerp(scx, midX, ease(clamp(-dT / Math.max(d1 - dT, 1), 0, 1))) : midX;
+        cy = c;
+      } else {
+        phase = 1;
+        if (dM > 0) {
+          var tA = clamp(-dT / Math.max(dM - dT, 1), 0, 1), gapA = vh * CFG.startAt - c;
+          cx = lerp(scx, midX, ease(tA));
+          cy = gapA > 1 ? c + gapA * Math.pow(1 - tA, Math.max(1, (dM - dT) / gapA)) : lerp(scy, c, ease(tA));
+        } else { cx = midX; cy = c; }
+      }
+      if (phase === 1) {
+        if (d1 > 0) { leg = 1; turn = clamp(-dT / Math.max(d1 - dT, 1), 0, 1); }
+        else { leg = 2; turn = clamp(-d1 / Math.max(dL - d1, 1), 0, 1); }
+        rotY = TURN * clamp(-dT / Math.max(dL - dT, 1), 0, 1);
+      }
+      burn = phase === 4 ? 1 : phase === 0 ? 0 : clamp((cy + h / 2 - L.top) / Math.max(h / 2 + (L.bottom - L.top) * CFG.burnEnd, 1), 0, 1);
+      uniforms.uBurn.value = burn;
+      var tilt = -Math.sin(Math.PI * turn) * CFG.tilt;
+
+      if (leg === 2) {
+        var key = 'r' + (window.__warpActive || 0);
+        if (key !== rowKey) { if (rowKey !== null) click(window.__warpActive || 0); rowKey = key; }
+      } else rowKey = null;
+      setFront(T.front); setBack(T.back || T.front);
+
+      var y = scrollPos(), v = (y - lastY) / dt; lastY = y;
+      vel = lerp(vel, v, .18);
+      var dx = lastCx === null ? 0 : (cx - lastCx) / dt; lastCx = cx;
+      flight = lerp(flight, phase === 1 ? 1 : 0, .1);
+      var tY = clamp(-vel / CFG.maxVel, -1, 1) * .9 * CFG.bend * flight;
+      var tX = clamp(dx / CFG.maxVel, -1, 1) * .7 * CFG.bend * flight;
+      bendY = lerp(bendY, tY, .09);
+      bendX = lerp(bendX, tX, .09);
+      flutter = lerp(flutter, Math.min(Math.abs(tY) + Math.abs(tX), 1) * flight, .06);
+
+      mesh.rotation.set(tilt, rotY, 0);
+      mesh.position.set(cx - vw / 2, -(cy - vh / 2), 0);
+      mesh.scale.set(w, h, 1);
+      uniforms.uSize.value.set(w, h);
+      uniforms.uBendY.value = bendY;
+      uniforms.uBendX.value = bendX;
+      uniforms.uFlutter.value = flutter;
+      uniforms.uTime.value = time;
+
+      var rest = phase === 0 && rev >= 1 ? 'start' : null;
+      if (rest) { bendY = bendX = flutter = vel = 0; }
+      showDom(rest);
+      lastPhase = phase;
+
+      mesh.visible = (phase === 1 || (phase === 0 && rev < 1)) && burn < 1;
+      var off = rest || rev <= 0 || phase === 4 || burn >= 1 || cy + h < -h || cy - h > vh + h;
+      if (!off) {
+        var rk = [cx, cy, w, h, rotY, tilt, bendY, bendX, rev, burn, curFront && curFront.tex.id, curBack && curBack.tex.id].join('|');
+        if (rk !== drawnKey || flutter > 1e-3 || (burn > 0 && burn < 1 && phase === 1)) { renderer.render(scene, camera); drawnKey = rk; }
+        cleared = false;
+      } else if (!cleared) { renderer.clear(); cleared = true; drawnKey = ''; }
+    }
+
+    var texW = startEl.offsetWidth * Math.min(window.devicePixelRatio || 1, 2) * CFG.svgScale, started = false;
+    function startLoop() {
+      if (started) return; started = true;
+      mesh.visible = true;
+      root.classList.add('flip-ready');
+      var last = performance.now();
+      (function loop(now) { frame(now, now - last); last = now; requestAnimationFrame(loop); })(last);
+    }
+    loadSrc(imgSrc(frontImg), texW, renderer).then(function (front) {
+      T.front = T.back = front;
+      setFront(front); setBack(front);
+      startLoop();
+      return loadSrc(imgSrc(backImg), texW, renderer).catch(function () { return null; }).then(function (b) {
+        T.back = b || front;
+        drawnKey = ''; idleY = null;
+      });
+    }).catch(function () {
+      if (!started) { canvas.remove(); showDom('start'); }
+      shown();
+    });
+  }
+
+  try { init(); } catch (e) { shown(); }
+})();
+</script>
