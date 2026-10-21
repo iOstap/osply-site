@@ -1,0 +1,62 @@
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js"}}</script>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js" crossorigin>
+
+
+
+<script>
+// ------------- HOME BOOT ------------- //
+(function () {
+  var d = document.documentElement;
+  if (d.classList.contains('w-editor')) return;
+  d.classList.add('osply-boot');
+  try {
+    var nav = performance.getEntriesByType('navigation')[0], ref = document.referrer ? new URL(document.referrer) : null;
+    if (ref && ref.origin === location.origin && ref.pathname !== location.pathname && (!nav || nav.type === 'navigate' || nav.type === 'back_forward')) {
+      window.__osplySoft = true; d.classList.add('osply-soft');
+      if (window.osplyVT) window.osplyVT.hold = true;
+    }
+  } catch (e) {}
+  setTimeout(function () { if (!window.__osplyHome) d.classList.remove('osply-boot'); }, 9000);
+})();
+</script>
+
+
+
+<style>
+/* ------------- HOME: HERO + WORK CAROUSEL ------------- */
+html:not(.w-editor) .page-wrap>.hero{position:relative;height:100vh;height:100svh;overflow:hidden}
+html:not(.w-editor) .hero>.main-top{z-index:3}
+html:not(.w-editor) .hero>.intro-text{z-index:4;pointer-events:none}
+html:not(.w-editor) .hero>.intro-text *{pointer-events:auto}
+html:not(.w-editor) .hero>.main-bottom{z-index:4}
+html:not(.w-editor) [data-work-list]{position:absolute!important;left:0;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;clip-path:inset(50%)}
+.work-stage{position:absolute;inset:0;z-index:2;pointer-events:none}
+.work-stage canvas{position:absolute;inset:0;width:100%!important;height:100%!important;display:block}
+.work-line{position:absolute;left:1rem;right:1rem;top:50%;height:.5px;background:rgba(255,255,255,.25);z-index:1;transform:scaleX(0);transform-origin:0 50%;pointer-events:none}
+.work-info{position:absolute;left:0;right:0;top:50%;z-index:3;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:1rem;padding:.6rem 1rem 0;color:#fff;pointer-events:none}
+.work-info .wi-field{position:relative;overflow:hidden;height:1.25em;line-height:1.25!important;white-space:nowrap}
+.work-info .wi-track{position:absolute;inset:0}
+.work-info .wi-track>span{position:absolute;left:0;top:0;width:100%;display:block;overflow:hidden;text-overflow:ellipsis;will-change:transform,opacity}
+.work-info .wi-num{grid-column:1/span 1}
+.work-info .wi-svc{grid-column:2/span 3}
+.work-info .wi-names{grid-column:10/span 2;position:relative;overflow:hidden;pointer-events:auto;clip-path:inset(0 0 .15em 0)}
+.work-info .wi-ind{grid-column:12/span 1;text-align:right;overflow:visible;clip-path:inset(0 0 0 -100vw)}
+.work-info .wi-ind .wi-track>span{left:auto;right:0;width:auto;overflow:visible;text-overflow:clip;text-align:right}
+.wi-row{position:absolute;left:0;top:0;width:100%;height:1.25em;line-height:1.25!important;overflow:hidden;cursor:pointer;white-space:nowrap}
+.wi-row>span{display:block;transition:opacity .3s}
+.wi-row:hover>span{opacity:.7!important}
+.work-pct{position:absolute;top:0;bottom:0;display:flex;align-items:center;overflow:hidden;color:#000;pointer-events:none;white-space:nowrap}
+.work-pct>span{display:block;line-height:1}
+.hero.is-mobile .work-info{display:none}
+.hero.is-mobile .work-line{left:0;right:0}
+.hero.is-hover-card{cursor:pointer}
+html.osply-boot .hero>.main-top{transform:translateY(calc(100vh - 100% - 2rem));transform:translateY(calc(100svh - 100% - 2rem))}
+html.osply-boot .hero-letter img{transform:translateY(100%) rotateX(60deg)}
+html.osply-boot .hero .nav-w{clip-path:inset(0 100% 0 0)}
+html.osply-boot .hero .nav-w .text-xs,html.osply-boot .hero .nav-w .nav-link{visibility:hidden}
+html.osply-boot .hero>.main-bottom{opacity:0}
+html:not(.w-editor) .hero [data-split="heading"]:not(.is-held){visibility:hidden}
+html:not(.w-editor) .hero-title{perspective:1000px;clip-path:inset(0 -50vw)}
+html:not(.w-editor) .hero-letter{overflow:visible;transform-style:preserve-3d}
+html:not(.w-editor) .hero-letter img{display:block;will-change:transform;backface-visibility:hidden}
+</style>

@@ -1,0 +1,83 @@
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://d3e54v103j8qbb.cloudfront.net" crossorigin>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+
+
+
+<style>
+/* ------------- SPLIT TEXT + COPY E-MAIL ------------- */
+
+[data-split="heading"]{opacity:0}
+html.w-editor [data-split="heading"]{opacity:1}
+[data-split="heading"]>*{text-indent:0}
+[data-split="heading"]>*:first-child{text-indent:inherit}
+.display .line{text-box:trim-both cap alphabetic;overflow:visible}
+.display .line-mask{padding-block:.06em;margin-block:-.06em}
+.cc-mask{display:inline-grid;overflow:hidden;vertical-align:top}
+.cc-mask>span{grid-area:1/1;display:block;white-space:nowrap;text-align:right}
+[data-copy-align="center"] .cc-mask>span{text-align:center}
+@media (max-width:667px){[data-copy-align="center"] .cc-mask>span{text-align:left}}
+</style>
+
+
+
+<style>
+/* ------------- PAGE TRANSITION ------------- */
+
+@media (prefers-reduced-motion:no-preference){
+@view-transition{navigation:auto}
+::view-transition-group(root){animation-duration:1.2s}
+::view-transition-old(root),::view-transition-new(root){mix-blend-mode:normal;animation-duration:1.2s;animation-timing-function:cubic-bezier(.65,.05,0,1);animation-fill-mode:both}
+::view-transition-old(root){animation-name:osply-vt-out}
+::view-transition-new(root){animation-name:osply-vt-in}
+}
+@keyframes osply-vt-out{from{transform:translateY(0);filter:brightness(1)}to{transform:translateY(-25%);filter:brightness(.35)}}
+@keyframes osply-vt-in{from{transform:translateY(100%)}to{transform:translateY(0)}}
+</style>
+
+
+
+<script>
+// ------------- PAGE TRANSITION ------------- //
+
+(function () {
+  var resume = null;
+  var VT = window.osplyVT = {
+    hold: false, ready: false, active: false, delay: .5,
+    wait: function () { return VT.active ? VT.delay : 0; },
+    go: function () { VT.ready = true; if (resume) resume(); }
+  };
+  addEventListener('pagereveal', function (e) {
+    var vt = e.viewTransition;
+    if (!vt) return;
+    VT.active = true;
+    vt.finished.then(function () { VT.active = false; }, function () { VT.active = false; });
+    if (!VT.hold || VT.ready) return;
+    vt.ready.then(function () {
+      if (VT.ready) return;
+      var anims = document.getAnimations().filter(function (a) { return a.effect && a.effect.pseudoElement && a.effect.pseudoElement.indexOf('::view-transition') === 0; });
+      anims.forEach(function (a) { a.pause(); });
+      var t = setTimeout(VT.go, 2500);
+      resume = function () { resume = null; clearTimeout(t); anims.forEach(function (a) { a.play(); }); };
+    }).catch(function () {});
+  });
+})();
+</script>
+
+
+
+<script>
+// ------------- GOOGLE ANALYTICS ------------- //
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-E7Z083DS8E');
+addEventListener('load', function () {
+  (window.requestIdleCallback || setTimeout)(function () {
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=G-E7Z083DS8E';
+    document.head.appendChild(s);
+  }, { timeout: 3000 });
+});
+</script>
