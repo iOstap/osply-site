@@ -15,7 +15,7 @@ async function init(title) {
   const { SVGLoader } = await import('three/addons/loaders/SVGLoader.js');
   const P = {
     depth: 0.16, tilt: -0.32, near: 260, tiltEase: 3,
-    chromeTint: '#dfe1e6', chromeRoughness: 0.16, chromeEnv: 1.25, exposure: 1.05,
+    chromeTint: '#c9ccd3', chromeRoughness: 0.2, chromeEnv: 1, exposure: 0.95,
     bloom: 0.45, bloomThreshold: 0.85, sparkles: 0.55, sparkleLength: 60,
     wireColor: '#d9d9d9', wireOpacity: 0.7, wireDetail: 3, wireMaxEdge: 0.5, wireRes: 0.5, wireBlur: 4, wireGlow: 1.1,
     curl: 10, splat: 70, force: 3500, velocityFade: 2.5, dyeFade: 1.6, maskLow: 0.12, maskHigh: 0.6,
@@ -222,7 +222,7 @@ async function init(title) {
   const envChrome = pmrem.fromScene(envScene, 0.015).texture;
 
   const matB = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(P.chromeTint), metalness: 1, roughness: P.chromeRoughness, envMap: envChrome, envMapIntensity: P.chromeEnv, clearcoat: 1, clearcoatRoughness: 0.06 });
-  matB.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin.replace('( isOrthographic )', '( false )')); };
+  matB.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin.replace('( isOrthographic ) ? vec3( 0, 0, 1 ) : normalize( vViewPosition )', 'normalize( vec3( vViewPosition.xy * vec2( 0.6, 3.2 ), vViewPosition.z ) )')); };
   const key = new THREE.DirectionalLight(0xffffff, 1.6);
   key.position.set(-300, 500, 900);
   scene.add(key, new THREE.AmbientLight(0xffffff, 0.08));
