@@ -12,37 +12,37 @@ function init(root) {
   const P = {
     background: getComputedStyle(document.documentElement).getPropertyValue('--color--background').trim() || '#0e0e0e',
     logoX: 0.25,
-    logoSize: 0.56,
+    logoSize: 0.46,
     depth: 5,
     tiltX: 0.18,
     tiltY: -0.42,
     follow: 0.35,
     pixel: 2,
-    gain: 1.35,
-    gamma: 1.1,
+    gain: 0.95,
+    gamma: 1.5,
     dotGap: 0,
     ditherEnv: 0.4,
     grain: 0.045,
     fibers: 0.5,
     chromeTint: '#e4e7ff',
     chromeRoughness: 0.1,
-    chromeEnv: 1.6,
-    exposure: 1.1,
-    bloom: 0.9,
-    bloomThreshold: 0.55,
-    sparkles: 1,
-    sparkleLength: 150,
+    chromeEnv: 1.2,
+    exposure: 1,
+    bloom: 0.6,
+    bloomThreshold: 0.8,
+    sparkles: 0.8,
+    sparkleLength: 90,
     curl: 22,
-    splatRadius: 0.28,
-    force: 5200,
-    velocityFade: 0.6,
-    dyeFade: 0.55,
-    maskLow: 0.08,
-    maskHigh: 0.55,
-    refraction: 1,
-    film: 0.07,
-    frost: 0.6,
-    aberration: 1,
+    splatRadius: 0.18,
+    force: 3800,
+    velocityFade: 1.2,
+    dyeFade: 2.2,
+    maskLow: 0.12,
+    maskHigh: 0.6,
+    refraction: 0.7,
+    film: 0.035,
+    frost: 0.5,
+    aberration: 0.5,
     intro: true
   };
 
@@ -144,7 +144,7 @@ function init(root) {
     }`,
     { uTexture: { value: null }, dir: { value: new THREE.Vector2() } });
 
-  const STARS = 12;
+  const STARS = 7;
   const compMat = new THREE.ShaderMaterial({
     depthTest: false, depthWrite: false,
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
@@ -168,7 +168,7 @@ function init(root) {
       void main(){
         vec2 frag = gl_FragCoord.xy;
         float dye = texture2D(tDye, vUv).r;
-        vec2 vel = texture2D(tVel, vUv).xy;
+        vec2 vel = clamp(texture2D(tVel, vUv).xy, -400.0, 400.0);
         float m = smoothstep(uMaskLow, uMaskHigh, dye);
         float edge = smoothstep(0.0, uMaskLow + 0.05, dye) * (1.0 - m);
 
@@ -240,9 +240,9 @@ function init(root) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envSoft = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   const envScene = new THREE.Scene();
-  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(20, 32, 16), new THREE.MeshBasicMaterial({ color: 0x050508, side: THREE.BackSide })));
+  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(20, 32, 16), new THREE.MeshBasicMaterial({ color: 0x15161c, side: THREE.BackSide })));
   const strip = (w, h, x, y, z, i, ry = 0, rz = 0) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(i, i, i * 1.05), side: THREE.DoubleSide }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(i * 0.6, i * 0.6, i * 0.64), side: THREE.DoubleSide }));
     m.position.set(x, y, z); m.lookAt(0, 0, 0); m.rotateZ(rz); m.rotateY(ry);
     envScene.add(m);
   };
@@ -261,7 +261,7 @@ function init(root) {
   let logo = null;
   const buildGeometry = () => {
     if (geometry) geometry.dispose();
-    geometry = new THREE.ExtrudeGeometry(shapes, { depth: P.depth, bevelEnabled: true, bevelThickness: 0.9, bevelSize: 0.55, bevelOffset: -0.2, bevelSegments: 10, curveSegments: 64 });
+    geometry = new THREE.ExtrudeGeometry(shapes, { depth: P.depth, bevelEnabled: true, bevelThickness: 0.7, bevelSize: 0.4, bevelOffset: -0.1, bevelSegments: 8, curveSegments: 64 });
     geometry.rotateX(Math.PI);
     geometry.center();
     geometry.computeBoundingBox();
@@ -269,7 +269,7 @@ function init(root) {
     pickStars();
   };
 
-  const matA = new THREE.MeshStandardMaterial({ color: 0x9a9a9a, metalness: 0.35, roughness: 0.28, envMap: envSoft, envMapIntensity: P.ditherEnv });
+  const matA = new THREE.MeshStandardMaterial({ color: 0x6a6a6a, metalness: 0.35, roughness: 0.28, envMap: envSoft, envMapIntensity: P.ditherEnv });
   const matB = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(P.chromeTint), metalness: 1, roughness: P.chromeRoughness, envMap: envChrome, envMapIntensity: P.chromeEnv, clearcoat: 1, clearcoatRoughness: 0.05 });
   const key = new THREE.DirectionalLight(0xffffff, 2.2);
   key.position.set(-3, 5, 6);
@@ -413,7 +413,7 @@ function init(root) {
     if (pointer.moved) {
       const dx = (pointer.x - pointer.px) * P.force * (aspect > 1 ? aspect : 1);
       const dy = (pointer.y - pointer.py) * P.force;
-      const amt = Math.min(Math.hypot(pointer.x - pointer.px, pointer.y - pointer.py) * 40, 1.2) + 0.15;
+      const amt = Math.min(Math.hypot(pointer.x - pointer.px, pointer.y - pointer.py) * 25, 0.8) + 0.08;
       splat(pointer.x, pointer.y, dx, dy, amt);
       pointer.px = pointer.x; pointer.py = pointer.y; pointer.moved = false;
     }
@@ -466,6 +466,7 @@ function init(root) {
     layout();
   };
 
+  root.logoReveal = { P, sync, rebuild: buildGeometry, replay: () => { intro.on = true; intro.t = 0; } };
   new ResizeObserver(resize).observe(root);
   resize();
   new IntersectionObserver(([e]) => { visible = e.isIntersecting && !document.hidden; }).observe(root);
