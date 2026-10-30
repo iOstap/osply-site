@@ -14,6 +14,7 @@ const CONFIG = {
   ink:[255,255,255], waveMid:[92,142,255], waveHead:[186,210,255],
   holdAuto: .85,
   anchor: parseFloat(D.anchor) || .5,
+  gap: D.gap ? parseFloat(D.gap) : 4,
 };
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const smooth=(x,a,b)=>{ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); };
@@ -144,7 +145,7 @@ function typeIn(b, delay=0){
 function typeOut(b){ return gsap.to(b,{p:0, duration:RM?.01:Math.min(.55,b.n*.008+.2), ease:'power1.in', onUpdate:()=>paint(b)}); }
 
 function layout(animate=true, dur=.95){
-  const mob=MOB(), center=col.clientHeight*(mob?.52:CONFIG.anchor), gap=(mob?2.5:4)*rem(), S2=.5; let y=null;
+  const mob=MOB(), center=col.clientHeight*(mob?.52:CONFIG.anchor), gap=(mob?2.5:CONFIG.gap)*rem(), S2=.5; let y=null;
   for(let k=stack.length-1;k>=0;k--){
     const b=stack[k], h=b.el.offsetHeight, role=stack.length-1-k; let to;
     if(role===0){ y=mob?innerHeight*MOB_TOP-col.offsetTop:center-h; to={y, scale:1, filter:'blur(0px)', opacity:1}; b.top=y; b.h=h; placeUI(b); }

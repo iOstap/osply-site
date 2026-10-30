@@ -22,6 +22,7 @@ function init(root) {
     logoWidth: 0.9,
     logoYMobile: 0.5,
     bob: 1,
+    sway: 1,
     depth: 4,
     tiltX: -0.3,
     tiltY: -0.1,
@@ -57,7 +58,7 @@ function init(root) {
     intro: true
   };
   const ds = root.dataset;
-  [['logoX', ds.logoX], ['logoY', ds.logoY], ['logoWidth', ds.logoWidth], ['logoYMobile', ds.logoYMobile], ['follow', ds.logoFollow], ['tiltX', ds.logoTiltX], ['tiltY', ds.logoTiltY], ['bob', ds.logoBob]].forEach(([k, v]) => { if (v !== undefined && v !== '') P[k] = parseFloat(v); });
+  [['logoX', ds.logoX], ['logoY', ds.logoY], ['logoWidth', ds.logoWidth], ['logoYMobile', ds.logoYMobile], ['follow', ds.logoFollow], ['tiltX', ds.logoTiltX], ['tiltY', ds.logoTiltY], ['bob', ds.logoBob], ['sway', ds.logoSway]].forEach(([k, v]) => { if (v !== undefined && v !== '') P[k] = parseFloat(v); });
 
   const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
   const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
@@ -491,7 +492,7 @@ function init(root) {
 
     rot.x += (P.tiltX - pointer.ny * P.follow * 0.5 - rot.x) * Math.min(dt * 3, 1);
     rot.y += (P.tiltY + pointer.nx * P.follow - rot.y) * Math.min(dt * 3, 1);
-    pivot.rotation.set(rot.x + Math.sin(time * 0.6) * 0.04, rot.y + Math.sin(time * 0.4) * 0.06, Math.sin(time * 0.5) * 0.02);
+    pivot.rotation.set(rot.x + Math.sin(time * 0.6) * 0.04 * P.sway, rot.y + Math.sin(time * 0.4) * 0.06 * P.sway, Math.sin(time * 0.5) * 0.02 * P.sway);
     logo.position.y = Math.sin(time * 0.8) * 0.35 * P.bob;
     scene.updateMatrixWorld();
 
