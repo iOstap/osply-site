@@ -154,7 +154,7 @@ function layout(animate=true, dur=.95){
   }
 }
 function textW(el){ const r=document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width/(gsap.getProperty(el,'scale')||1); }
-function placeUI(b){ if(!b||!b.ui) return; b.ui.style.top = MOB() && b.top!=null ? (b.top+b.h+(b.ui.classList.contains('is-cards')?1:2)*rem())+'px' : '';
+function placeUI(b){ if(!b||!b.ui) return; b.ui.style.top = (MOB() || CONFIG.anchor!==.5) && b.top!=null ? (b.top+b.h+(b.ui.classList.contains('is-cards')?1:2)*rem())+'px' : '';
   const wide=b.ui.querySelectorAll('[data-fit]'); if(wide.length){ const w=MOB()?'':Math.ceil(textW(b.el))+'px'; wide.forEach(n=>{ n.style.width=w; n.style.maxWidth=w?'none':''; }); } }
 function showUI(b,at){
   if(!b.ui) return;
