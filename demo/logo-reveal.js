@@ -1,7 +1,6 @@
 // ------------- LOGO REVEAL ------------- //
 import * as THREE from 'three';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const root = document.querySelector('[data-logo-reveal]');
 if (root) init(root);
@@ -18,10 +17,10 @@ function init(root) {
     tiltY: -0.42,
     follow: 0.35,
     pixel: 2,
-    gain: 0.95,
-    gamma: 1.5,
+    gain: 1.1,
+    gamma: 1.25,
     dotGap: 0,
-    ditherEnv: 0.4,
+    ditherEnv: 0.75,
     grain: 0.045,
     fibers: 0.5,
     chromeTint: '#e4e7ff',
@@ -238,7 +237,6 @@ function init(root) {
   camera.position.set(0, 0, 10);
 
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const envSoft = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   const envScene = new THREE.Scene();
   envScene.add(new THREE.Mesh(new THREE.SphereGeometry(20, 64, 32), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false,
@@ -281,7 +279,7 @@ function init(root) {
     pickStars();
   };
 
-  const matA = new THREE.MeshStandardMaterial({ color: 0x6a6a6a, metalness: 0.35, roughness: 0.28, envMap: envSoft, envMapIntensity: P.ditherEnv });
+  const matA = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.85, roughness: 0.24, envMap: envChrome, envMapIntensity: P.ditherEnv });
   const matB = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(P.chromeTint), metalness: 1, roughness: P.chromeRoughness, envMap: envChrome, envMapIntensity: P.chromeEnv, clearcoat: 1, clearcoatRoughness: 0.05 });
   const key = new THREE.DirectionalLight(0xffffff, 2.2);
   key.position.set(-3, 5, 6);
