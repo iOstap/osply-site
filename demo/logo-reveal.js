@@ -17,12 +17,13 @@ function init(root) {
     tiltY: -0.1,
     follow: 0.8,
     wireColor: '#d9d9d9',
-    wireOpacity: 0.75,
+    wireOpacity: 0.55,
     wireDetail: 3,
+    wireMaxEdge: 0.3,
     wireRes: 0.5,
-    wireBlur: 1.5,
-    wireGlow: 0.6,
-    grain: 0.2,
+    wireBlur: 6,
+    wireGlow: 1.29,
+    grain: 0.15,
     fibers: 0.83,
     chromeTint: '#0e0e0e',
     chromeRoughness: 0.39,
@@ -291,10 +292,13 @@ function init(root) {
     const pos = solid.attributes.position;
     const caps = solid.groups[0];
     const pts = [];
+    const max = Math.max(a.x, a.y) * P.wireMaxEdge;
+    const va = new THREE.Vector3(), vb = new THREE.Vector3();
     for (let i = caps.start; i < caps.start + caps.count; i += 3) {
       for (let k = 0; k < 3; k++) {
-        const a = i + k, b = i + ((k + 1) % 3);
-        pts.push(pos.getX(a), pos.getY(a), pos.getZ(a), pos.getX(b), pos.getY(b), pos.getZ(b));
+        va.fromBufferAttribute(pos, i + k);
+        vb.fromBufferAttribute(pos, i + ((k + 1) % 3));
+        if (va.distanceTo(vb) <= max) pts.push(va.x, va.y, va.z, vb.x, vb.y, vb.z);
       }
     }
     const edges = new THREE.EdgesGeometry(solid, 1);
@@ -521,6 +525,7 @@ function init(root) {
       f2.addColor(P, 'wireColor');
       f2.add(P, 'wireOpacity', 0, 1, 0.01);
       f2.add(P, 'wireDetail', 1, 12, 1).onFinishChange(buildWire);
+      f2.add(P, 'wireMaxEdge', 0, 1, 0.01).onFinishChange(buildWire);
       f2.add(P, 'wireRes', 0.2, 1, 0.05).onFinishChange(resize);
       f2.add(P, 'wireBlur', 0, 6, 0.1);
       f2.add(P, 'wireGlow', 0, 2, 0.01);
