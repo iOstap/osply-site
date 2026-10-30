@@ -20,6 +20,7 @@ function init(root) {
     logoX: 0.5,
     logoY: 0.5,
     logoWidth: 0.9,
+    logoYMobile: 0.5,
     depth: 4,
     tiltX: -0.3,
     tiltY: -0.1,
@@ -54,6 +55,8 @@ function init(root) {
     aberration: 0.25,
     intro: true
   };
+  const ds = root.dataset;
+  [['logoX', ds.logoX], ['logoY', ds.logoY], ['logoWidth', ds.logoWidth], ['logoYMobile', ds.logoYMobile]].forEach(([k, v]) => { if (v !== undefined && v !== '') P[k] = parseFloat(v); });
 
   const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
   const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
@@ -383,7 +386,7 @@ function init(root) {
     const box = new THREE.Vector3();
     geometry.boundingBox.getSize(box);
     pivot.scale.setScalar(Math.min((mobile ? vw * 0.92 : vw * P.logoWidth) / box.x, vh * 0.6 / box.y));
-    pivot.position.set(mobile ? 0 : -vw / 2 + vw * P.logoX, vh / 2 - vh * P.logoY, 0);
+    pivot.position.set(mobile ? 0 : -vw / 2 + vw * P.logoX, vh / 2 - vh * (mobile ? P.logoYMobile : P.logoY), 0);
   };
 
   const splat = (x, y, dx, dy, amount) => {
@@ -430,16 +433,32 @@ function init(root) {
     pointer.nx = x * 2 - 1; pointer.ny = y * 2 - 1;
     intro.on = false;
   };
-  root.addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY), { passive: true });
-  root.addEventListener('pointerdown', (e) => onMove(e.clientX, e.clientY), { passive: true });
-  root.addEventListener('pointerleave', () => { pointer.active = false; pointer.nx = 0; pointer.ny = 0; });
+  addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY), { passive: true });
+  addEventListener('pointerdown', (e) => onMove(e.clientX, e.clientY), { passive: true });
+  document.documentElement.addEventListener('pointerleave', () => { pointer.active = false; pointer.nx = 0; pointer.ny = 0; });
 
   const intro = { on: P.intro, t: 0 };
   const introPath = (t) => {
     const mobile = aspect < 0.8;
-    const lx = mobile ? 0.5 : P.logoX, ly = 1 - P.logoY, w = mobile ? 0.92 : P.logoWidth;
+    const lx = mobile ? 0.5 : P.logoX, ly = 1 - (mobile ? P.logoYMobile : P.logoY), w = mobile ? 0.92 : P.logoWidth;
     const e = t * t * (3 - 2 * t);
     return [lx - w / 2 + e * w, ly + Math.sin(e * Math.PI * 3) * 0.06];
+  };
+
+  const waves = [];
+  const wave = (k = 1, reverse = false) => { waves.push({ t: 0, k, reverse, px: null, py: null }); };
+  const runWaves = (dt) => {
+    for (let i = waves.length - 1; i >= 0; i--) {
+      const w = waves[i];
+      w.t = Math.min(w.t + dt / 1.4, 1);
+      const [x, y] = introPath(w.reverse ? 1 - w.t : w.t);
+      if (w.px !== null) {
+        const dx = (x - w.px) * P.force * (aspect > 1 ? aspect : 1) * w.k, dy = (y - w.py) * P.force * w.k;
+        splat(x, y, dx, dy, (Math.min(Math.hypot(x - w.px, y - w.py) * 25, 0.8) + 0.08) * w.k);
+      }
+      w.px = x; w.py = y;
+      if (w.t >= 1) waves.splice(i, 1);
+    }
   };
 
   const tmp = new THREE.Vector3();
@@ -466,6 +485,7 @@ function init(root) {
       splat(pointer.x, pointer.y, dx, dy, amt);
       pointer.px = pointer.x; pointer.py = pointer.y; pointer.moved = false;
     }
+    runWaves(dt);
     step(dt);
 
     rot.x += (P.tiltX - pointer.ny * P.follow * 0.5 - rot.x) * Math.min(dt * 3, 1);
@@ -514,7 +534,7 @@ function init(root) {
     layout();
   };
 
-  root.logoReveal = { P, sync, rebuild: buildGeometry, replay: () => { intro.on = true; intro.t = 0; } };
+  root.logoReveal = { P, sync, wave, rebuild: buildGeometry, replay: () => { intro.on = true; intro.t = 0; } };
   new ResizeObserver(resize).observe(root);
   resize();
   new IntersectionObserver(([e]) => { visible = e.isIntersecting && !document.hidden; }).observe(root);
