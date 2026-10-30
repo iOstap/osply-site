@@ -17,8 +17,11 @@ function init(root) {
     tiltY: -0.1,
     follow: 0.8,
     wireColor: '#d9d9d9',
-    wireOpacity: 0.55,
+    wireOpacity: 0.75,
     wireDetail: 3,
+    wireRes: 0.5,
+    wireBlur: 1.5,
+    wireGlow: 0.6,
     grain: 0.2,
     fibers: 0.83,
     chromeTint: '#0e0e0e',
@@ -149,7 +152,7 @@ function init(root) {
       varying vec2 vUv;
       uniform sampler2D tA; uniform sampler2D tB; uniform sampler2D tBloom1; uniform sampler2D tBloom2; uniform sampler2D tDye; uniform sampler2D tVel;
       uniform vec2 uRes; uniform float uDpr; uniform float uTime; uniform vec3 uBg;
-      uniform vec3 uWire; uniform float uWireOpacity; uniform float uGrain; uniform float uFibers;
+      uniform vec3 uWire; uniform float uWireOpacity; uniform float uWireBlur; uniform float uWireGlow; uniform float uGrain; uniform float uFibers;
       uniform float uExposure; uniform float uBloom; uniform float uSparkles; uniform float uSparkleLength;
       uniform float uMaskLow; uniform float uMaskHigh; uniform float uRefraction; uniform float uFilm; uniform float uFrost; uniform float uAberration;
       uniform vec4 uStars[${STARS}];
@@ -176,6 +179,13 @@ function init(root) {
           frost += uWire * s.a;
         }
         frost /= 8.0;
+
+        float glow = 0.0;
+        for (int i = 0; i < 8; i++) {
+          float ang = float(i) * 0.785398 + 0.39;
+          glow += texture2D(tA, vUv + vec2(cos(ang), sin(ang)) * uWireBlur * uDpr / uRes).a;
+        }
+        wire = clamp(wire + glow / 8.0 * uWireGlow, 0.0, 1.0);
 
         vec3 col = uBg;
         float fib = noise(vec2(frag.x * 0.004, frag.y * 0.35) / uDpr) * noise(vec2(frag.x * 0.02, frag.y * 0.9) / uDpr);
@@ -213,7 +223,7 @@ function init(root) {
     uniforms: {
       tA: { value: null }, tB: { value: null }, tBloom1: { value: null }, tBloom2: { value: null }, tDye: { value: null }, tVel: { value: null },
       uRes: { value: new THREE.Vector2() }, uDpr: { value: dpr }, uTime: { value: 0 }, uBg: { value: new THREE.Color() },
-      uWire: { value: new THREE.Color() }, uWireOpacity: { value: 0.5 }, uGrain: { value: 0 }, uFibers: { value: 0 },
+      uWire: { value: new THREE.Color() }, uWireOpacity: { value: 0.5 }, uWireBlur: { value: 1 }, uWireGlow: { value: 0 }, uGrain: { value: 0 }, uFibers: { value: 0 },
       uExposure: { value: 1 }, uBloom: { value: 1 }, uSparkles: { value: 1 }, uSparkleLength: { value: 150 },
       uMaskLow: { value: 0.1 }, uMaskHigh: { value: 0.5 }, uRefraction: { value: 1 }, uFilm: { value: 0 }, uFrost: { value: 0 }, uAberration: { value: 1 },
       uStars: { value: Array.from({ length: STARS }, () => new THREE.Vector4()) }
@@ -278,7 +288,20 @@ function init(root) {
     geometry.boundingBox.getSize(a); solid.boundingBox.getSize(b);
     solid.scale(a.x / b.x, a.y / b.y, a.z / b.z);
     wire.geometry.dispose();
-    wire.geometry = new THREE.WireframeGeometry(solid);
+    const pos = solid.attributes.position;
+    const caps = solid.groups[0];
+    const pts = [];
+    for (let i = caps.start; i < caps.start + caps.count; i += 3) {
+      for (let k = 0; k < 3; k++) {
+        const a = i + k, b = i + ((k + 1) % 3);
+        pts.push(pos.getX(a), pos.getY(a), pos.getZ(a), pos.getX(b), pos.getY(b), pos.getZ(b));
+      }
+    }
+    const edges = new THREE.EdgesGeometry(solid, 1);
+    pts.push(...edges.attributes.position.array);
+    edges.dispose();
+    wire.geometry = new THREE.BufferGeometry();
+    wire.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
     solid.dispose();
   };
   const matB = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(P.chromeTint), metalness: 1, roughness: P.chromeRoughness, envMap: envChrome, envMapIntensity: P.chromeEnv, clearcoat: 1, clearcoatRoughness: 0.05 });
@@ -325,7 +348,7 @@ function init(root) {
     renderer.setSize(W, H, false);
     const w = Math.floor(W * dpr), h = Math.floor(H * dpr);
     [rtA, rtB, bloom1a, bloom1b, bloom2a, bloom2b].forEach((r) => r && r.dispose());
-    rtA = rt(w, h, { samples: 4, depthBuffer: true });
+    rtA = rt(Math.max(1, Math.round(w * P.wireRes)), Math.max(1, Math.round(h * P.wireRes)), { samples: 4, depthBuffer: true });
     rtB = rt(w, h, { samples: 4, depthBuffer: true });
     bloom1a = rt(w >> 2, h >> 2); bloom1b = rt(w >> 2, h >> 2);
     bloom2a = rt(w >> 3, h >> 3); bloom2b = rt(w >> 3, h >> 3);
@@ -466,7 +489,7 @@ function init(root) {
     u.tA.value = rtA.texture; u.tB.value = rtB.texture; u.tBloom1.value = bloom1a.texture; u.tBloom2.value = bloom2a.texture;
     u.tDye.value = dye.read.texture; u.tVel.value = velocity.read.texture;
     u.uRes.value.set(W * dpr, H * dpr); u.uTime.value = time; u.uBg.value.copy(bg.set(P.background));
-    u.uWire.value.set(P.wireColor); u.uWireOpacity.value = P.wireOpacity; u.uGrain.value = P.grain; u.uFibers.value = P.fibers;
+    u.uWire.value.set(P.wireColor); u.uWireOpacity.value = P.wireOpacity; u.uWireBlur.value = P.wireBlur; u.uWireGlow.value = P.wireGlow; u.uGrain.value = P.grain; u.uFibers.value = P.fibers;
     u.uExposure.value = P.exposure; u.uBloom.value = P.bloom; u.uSparkles.value = P.sparkles; u.uSparkleLength.value = P.sparkleLength;
     u.uMaskLow.value = P.maskLow; u.uMaskHigh.value = P.maskHigh; u.uRefraction.value = P.refraction; u.uFilm.value = P.film; u.uFrost.value = P.frost; u.uAberration.value = P.aberration;
     pass(compMat, null);
@@ -498,6 +521,9 @@ function init(root) {
       f2.addColor(P, 'wireColor');
       f2.add(P, 'wireOpacity', 0, 1, 0.01);
       f2.add(P, 'wireDetail', 1, 12, 1).onFinishChange(buildWire);
+      f2.add(P, 'wireRes', 0.2, 1, 0.05).onFinishChange(resize);
+      f2.add(P, 'wireBlur', 0, 6, 0.1);
+      f2.add(P, 'wireGlow', 0, 2, 0.01);
       f2.add(P, 'grain', 0, 0.2, 0.001);
       f2.add(P, 'fibers', 0, 2, 0.01);
       f2.addColor(P, 'background');
