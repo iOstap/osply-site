@@ -1,18 +1,45 @@
 // ------------- LOGO REVEAL ------------- //
-import * as THREE from 'three';
-import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
-
+const LOGO = [
+  'M276.632 15.5077V152.492L236.656 168H39.9758L0 152.492V15.5077L39.9758 0H236.656L276.632 15.5077ZM126.324 160.246H150.31V7.75384H126.324V160.246Z',
+  'M559.342 15.5077V68.4923H433.018V7.75384H409.032V80.1231H519.364L559.342 95.6308V152.492L519.364 168H322.684L282.709 152.492V99.5077H409.032V160.246H433.018V87.8769H322.684L282.709 72.3692V15.5077L322.684 0H519.364L559.342 15.5077Z',
+  'M842.05 15.5077V78.8308L802.072 94.3384H691.741V168H565.417V0H802.072L842.05 15.5077ZM691.741 86.5847H715.727V7.75384H691.741V86.5847Z',
+  'M974.45 160.246H998.435V99.5077H1124.76V168H848.126V0H974.45V160.246Z',
+  'M1256.36 108.554H1281.14V0H1407.47V97.6985L1332.31 117.342V168H1205.99V117.342L1130.83 97.6985V0H1256.36V108.554Z'
+];
 const root = document.querySelector('[data-logo-reveal]');
-if (root) init(root);
+const narrow = matchMedia('(max-width: 991px)');
+const useMark = root && root.hasAttribute('data-logo-mark');
+let started = false, marked = false;
+const boot = () => {
+  if (useMark && narrow.matches) { if (!marked) { marked = true; mark(root); } return; }
+  if (!started) { started = true; init(root); }
+};
+if (root) { boot(); narrow.addEventListener('change', boot); }
 
-function init(root) {
-  const LOGO = [
-    'M276.632 15.5077V152.492L236.656 168H39.9758L0 152.492V15.5077L39.9758 0H236.656L276.632 15.5077ZM126.324 160.246H150.31V7.75384H126.324V160.246Z',
-    'M559.342 15.5077V68.4923H433.018V7.75384H409.032V80.1231H519.364L559.342 95.6308V152.492L519.364 168H322.684L282.709 152.492V99.5077H409.032V160.246H433.018V87.8769H322.684L282.709 72.3692V15.5077L322.684 0H519.364L559.342 15.5077Z',
-    'M842.05 15.5077V78.8308L802.072 94.3384H691.741V168H565.417V0H802.072L842.05 15.5077ZM691.741 86.5847H715.727V7.75384H691.741V86.5847Z',
-    'M974.45 160.246H998.435V99.5077H1124.76V168H848.126V0H974.45V160.246Z',
-    'M1256.36 108.554H1281.14V0H1407.47V97.6985L1332.31 117.342V168H1205.99V117.342L1130.83 97.6985V0H1256.36V108.554Z'
-  ];
+function mark(root) {
+  const box = document.createElement('div');
+  box.setAttribute('data-logo-mark-box', '');
+  box.style.cssText = 'position:absolute;top:0;bottom:0;left:var(--_default---site--margin,20px);width:calc((100% - 2 * var(--_default---site--margin,20px)) / 2);overflow:hidden;color:#fff;opacity:.08;pointer-events:none';
+  const track = document.createElement('div');
+  track.style.cssText = 'position:absolute;left:0;width:100%;will-change:transform';
+  const svg = `<svg viewBox="0 0 168 1408" width="100%" style="display:block" aria-hidden="true"><g transform="translate(168 0) rotate(90)" fill="currentColor">${LOGO.map((d) => `<path d="${d}"/>`).join('')}</g></svg>`;
+  track.innerHTML = svg + svg + svg;
+  box.appendChild(track);
+  root.appendChild(box);
+  let anim = null;
+  const fit = () => {
+    const w = box.clientWidth, h = w * 1408 / 168, g = w * 5.4 / 168, H = box.clientHeight;
+    [...track.children].forEach((c) => { c.style.marginBottom = g + 'px'; });
+    track.style.top = (H - h) / 2 + 'px';
+    if (anim) anim.cancel();
+    anim = track.animate([{ transform: 'translateY(0)' }, { transform: `translateY(${-(h + g)}px)` }], { duration: (h + g) / 28 * 1000, iterations: Infinity });
+  };
+  new ResizeObserver(fit).observe(box);
+}
+
+async function init(root) {
+  const THREE = await import('three');
+  const { SVGLoader } = await import('three/addons/loaders/SVGLoader.js');
   const K = 168 / 24;
 
   const P = {
@@ -511,7 +538,7 @@ function init(root) {
 
   const render = (now) => {
     raf = requestAnimationFrame(render);
-    if (!visible) { last = now; return; }
+    if (!visible || (useMark && narrow.matches)) { last = now; return; }
     const dt = Math.min((now - last) / 1000, 1 / 30);
     last = now; time += dt;
 
