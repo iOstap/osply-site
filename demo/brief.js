@@ -152,7 +152,8 @@ function layout(animate=true, dur=.95){
   for(let k=stack.length-1;k>=0;k--){
     const b=stack[k], h=b.el.offsetHeight, role=stack.length-1-k; let to;
     if(role===0){ y=CONFIG.under?underY(mob):mob?innerHeight*MOB_TOP-col.offsetTop:center-h; to={y, scale:1, filter:'blur(0px)', opacity:1}; b.top=y; b.h=h; placeUI(b); }
-    else { y=y-gap-h*S2; to={y, scale:S2, filter:role===1?'blur(5px)':'blur(14px)', opacity:role===1&&!mob&&CONFIG.history?.9:0}; }
+    else if(!CONFIG.history){ to={y:stack[stack.length-1].top-1.5*rem(), scale:1, filter:'blur(0px)', opacity:0}; }
+    else { y=y-gap-h*S2; to={y, scale:S2, filter:role===1?'blur(5px)':'blur(14px)', opacity:role===1&&!mob?.9:0}; }
     if(!b.placed){ b.placed=true; gsap.set(b.el,to); continue; }
     if(animate) gsap.to(b.el,{...to, duration:dur, ease:'expo.inOut', overwrite:'auto'}); else gsap.set(b.el,to);
   }
