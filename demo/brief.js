@@ -146,7 +146,7 @@ function typeIn(b, delay=0){
 }
 function typeOut(b){ return gsap.to(b,{p:0, duration:RM?.01:Math.min(.55,b.n*.008+.2), ease:'power1.in', onUpdate:()=>paint(b)}); }
 
-function underY(mob){ return progEl.getBoundingClientRect().bottom+(mob?2.5:5)*rem()-col.getBoundingClientRect().top; }
+function underY(mob){ return progEl.getBoundingClientRect().top+(mob?2.5:5)*rem()-col.getBoundingClientRect().top; }
 function layout(animate=true, dur=.95){
   const mob=MOB(), center=col.clientHeight*(mob?.52:CONFIG.anchor), gap=(mob?2.5:CONFIG.gap)*rem(), S2=.5; let y=null;
   for(let k=stack.length-1;k>=0;k--){
