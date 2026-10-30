@@ -31,7 +31,7 @@ function init(root) {
     bloom: 0.6,
     bloomThreshold: 0.8,
     sparkles: 0.8,
-    sparkleLength: 90,
+    sparkleLength: 70,
     curl: 22,
     splatRadius: 0.18,
     force: 3800,
@@ -39,10 +39,10 @@ function init(root) {
     dyeFade: 2.2,
     maskLow: 0.12,
     maskHigh: 0.6,
-    refraction: 0.7,
+    refraction: 0.35,
     film: 0.035,
     frost: 0.5,
-    aberration: 0.5,
+    aberration: 0.25,
     intro: true
   };
 
@@ -240,7 +240,19 @@ function init(root) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envSoft = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   const envScene = new THREE.Scene();
-  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(20, 32, 16), new THREE.MeshBasicMaterial({ color: 0x15161c, side: THREE.BackSide })));
+  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(20, 64, 32), new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `varying vec3 vDir; void main(){
+      float y = vDir.y;
+      float band = smoothstep(-0.32, -0.02, y) * (1.0 - smoothstep(0.02, 0.42, y));
+      vec3 c = vec3(0.02, 0.02, 0.028);
+      c += vec3(0.95, 0.97, 1.1) * band * 1.25;
+      c += vec3(0.35, 0.36, 0.42) * smoothstep(0.55, 1.0, y);
+      c += vec3(0.12, 0.12, 0.15) * smoothstep(-0.4, -1.0, y);
+      gl_FragColor = vec4(c, 1.0);
+    }`
+  })));
   const strip = (w, h, x, y, z, i, ry = 0, rz = 0) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(i * 0.6, i * 0.6, i * 0.64), side: THREE.DoubleSide }));
     m.position.set(x, y, z); m.lookAt(0, 0, 0); m.rotateZ(rz); m.rotateY(ry);
