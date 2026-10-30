@@ -147,7 +147,6 @@ function typeIn(b, delay=0){
 }
 function typeOut(b){ return gsap.to(b,{p:0, duration:RM?.01:Math.min(.55,b.n*.008+.2), ease:'power1.in', onUpdate:()=>paint(b)}); }
 
-const margin=()=>{ const p=document.createElement('div'); p.style.cssText='position:absolute;visibility:hidden;width:var(--_default---site--margin,20px)'; document.body.appendChild(p); const w=p.offsetWidth; p.remove(); return w; };
 const stepEl=CONFIG.counter?(()=>{ const e=document.createElement('div'); e.className='text-m brief-step'; e.setAttribute('aria-hidden','true');
   e.style.cssText='position:fixed;left:var(--_default---site--margin,20px);top:0;display:grid;overflow:hidden;pointer-events:none;z-index:3;opacity:0';
   ROOT.appendChild(e); return e; })():null;
@@ -177,7 +176,7 @@ function layout(animate=true, dur=.95){
 }
 function textW(el){ const r=document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width/(gsap.getProperty(el,'scale')||1); }
 function placeUI(b){ if(!b||!b.ui) return; const low=CONFIG.under&&!MOB();
-  b.ui.style.top = low ? Math.max(b.top+b.h+2*rem(), col.clientHeight-b.ui.offsetHeight-margin())+'px' : (MOB() || CONFIG.under || CONFIG.anchor!==.5) && b.top!=null ? (b.top+b.h+(b.ui.classList.contains('is-cards')?1:2)*rem())+'px' : '';
+  b.ui.style.top = low ? 'auto' : (MOB() || CONFIG.under || CONFIG.anchor!==.5) && b.top!=null ? (b.top+b.h+(b.ui.classList.contains('is-cards')?1:2)*rem())+'px' : '';
   const wide=b.ui.querySelectorAll('[data-fit]'); if(wide.length){ const w=MOB()?'':Math.ceil(textW(b.el))+'px'; wide.forEach(n=>{ n.style.width=w; n.style.maxWidth=w?'none':''; }); } }
 function showUI(b,at){
   if(!b.ui) return;
