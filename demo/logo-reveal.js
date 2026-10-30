@@ -17,12 +17,13 @@ function init(root) {
 
   const P = {
     background: getComputedStyle(document.documentElement).getPropertyValue('--color--background').trim() || '#0e0e0e',
-    logoX: 0.25,
-    logoWidth: 0.42,
+    logoX: 0.5,
+    logoY: 0.17,
+    logoWidth: 0.94,
     depth: 4,
     tiltX: -0.3,
     tiltY: -0.1,
-    follow: 0.8,
+    follow: 0.25,
     wireColor: '#d9d9d9',
     wireOpacity: 0.55,
     wireDetail: 3,
@@ -32,7 +33,7 @@ function init(root) {
     wireGlow: 1.29,
     grain: 0.15,
     fibers: 0.83,
-    chromeTint: '#0e0e0e',
+    chromeTint: '#5b5e68',
     chromeRoughness: 0.39,
     chromeEnv: 1.2,
     exposure: 1,
@@ -381,8 +382,8 @@ function init(root) {
     const mobile = aspect < 0.8;
     const box = new THREE.Vector3();
     geometry.boundingBox.getSize(box);
-    pivot.scale.setScalar(Math.min((mobile ? vw * 0.86 : vw * P.logoWidth) / box.x, vh * 0.6 / box.y));
-    pivot.position.set(mobile ? 0 : -vw / 2 + vw * P.logoX, mobile ? vh * 0.12 : 0, 0);
+    pivot.scale.setScalar(Math.min((mobile ? vw * 0.92 : vw * P.logoWidth) / box.x, vh * 0.6 / box.y));
+    pivot.position.set(mobile ? 0 : -vw / 2 + vw * P.logoX, vh / 2 - vh * (mobile ? 0.12 : P.logoY), 0);
   };
 
   const splat = (x, y, dx, dy, amount) => {
@@ -435,10 +436,10 @@ function init(root) {
 
   const intro = { on: P.intro, t: 0 };
   const introPath = (t) => {
-    const lx = aspect < 0.8 ? 0.5 : P.logoX;
-    const ly = aspect < 0.8 ? 0.62 : 0.5;
+    const mobile = aspect < 0.8;
+    const lx = mobile ? 0.5 : P.logoX, ly = 1 - (mobile ? 0.12 : P.logoY), w = mobile ? 0.92 : P.logoWidth;
     const e = t * t * (3 - 2 * t);
-    return [lx - 0.22 + e * 0.44, ly + Math.sin(e * Math.PI * 1.5) * 0.12];
+    return [lx - w / 2 + e * w, ly + Math.sin(e * Math.PI * 3) * 0.06];
   };
 
   const tmp = new THREE.Vector3();
@@ -524,7 +525,8 @@ function init(root) {
     import('https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/+esm').then(({ default: GUI }) => {
       const gui = new GUI({ title: 'Logo Reveal' });
       const f1 = gui.addFolder('Logo');
-      f1.add(P, 'logoX', 0.1, 0.5, 0.01).onChange(sync);
+      f1.add(P, 'logoX', 0.1, 0.9, 0.01).onChange(sync);
+      f1.add(P, 'logoY', 0.05, 0.95, 0.01).onChange(sync);
       f1.add(P, 'logoWidth', 0.2, 0.95, 0.01).onChange(sync);
       f1.add(P, 'depth', 1, 12, 0.1).onFinishChange(buildGeometry);
       f1.add(P, 'tiltX', -1, 1, 0.01);
