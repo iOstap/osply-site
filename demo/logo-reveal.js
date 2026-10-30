@@ -4,7 +4,7 @@ import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 
 const FONT = '"IBM Plex Mono", ui-monospace, monospace';
 const root = document.querySelector('[data-logo-reveal]');
-if (root) (document.fonts ? document.fonts.load(`400 64px ${FONT}`) : Promise.resolve()).catch(() => {}).then(() => init(root));
+if (root) Promise.race([document.fonts ? document.fonts.load('400 64px "IBM Plex Mono"', 'Aa{}/\\|_') : Promise.resolve(), new Promise((r) => setTimeout(r, 2500))]).catch(() => {}).then(() => init(root));
 
 function init(root) {
   const LOGO = 'M17.6 0C21.1346 0 24 2.86538 24 6.4V10.0519C24 10.9006 23.6629 11.7145 23.0627 12.3146L12.3146 23.0627C11.7145 23.6629 10.9006 24 10.0519 24H6.4C2.86538 24 1.80416e-07 21.1346 0 17.6L0 14.0322C0 13.1835 0.337142 12.3696 0.937258 11.7695L11.7695 0.937259C12.3696 0.337142 13.1835 0 14.0322 0L17.6 0ZM8.96 5.76C7.19269 5.76 5.76 7.19269 5.76 8.96V15.04C5.76 16.8074 7.19269 18.24 8.96 18.24H15.04C16.8074 18.24 18.24 16.8074 18.24 15.04V8.96C18.24 7.19269 16.8074 5.76 15.04 5.76H8.96Z';
