@@ -168,7 +168,7 @@ function init(root) {
       uniform vec2 uRes; uniform float uDpr; uniform float uTime; uniform vec3 uBg;
       uniform vec3 uWire; uniform float uWireOpacity; uniform float uWireBlur; uniform float uWireGlow; uniform float uGrain; uniform float uFibers;
       uniform float uExposure; uniform float uBloom; uniform float uSparkles; uniform float uSparkleLength;
-      uniform float uMaskLow; uniform float uMaskHigh; uniform float uRefraction; uniform float uFilm; uniform float uFrost; uniform float uAberration;
+      uniform float uMaskLow; uniform float uMaskHigh; uniform float uRefraction; uniform float uFilm; uniform float uFrost; uniform float uAberration; uniform float uFill;
       uniform vec4 uStars[${STARS}];
 
       float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -181,7 +181,10 @@ function init(root) {
         float dye = texture2D(tDye, vUv).r;
         vec2 vel = clamp(texture2D(tVel, vUv).xy, -400.0, 400.0);
         float m = smoothstep(uMaskLow, uMaskHigh, dye);
-        float edge = smoothstep(0.0, uMaskLow + 0.05, dye) * (1.0 - m);
+        float front = uFill * 1.5 - 0.25 + (noise(vUv * vec2(4.0, 9.0) + uTime * 0.15) - 0.5) * 0.18;
+        float filled = 1.0 - smoothstep(front - 0.1, front + 0.1, vUv.x);
+        m = mix(m, 1.0 - m, filled);
+        float edge = smoothstep(0.0, uMaskLow + 0.05, dye) * (1.0 - smoothstep(uMaskLow, uMaskHigh, dye)) * (1.0 - filled);
 
         vec3 layerColor = uWire;
         float glow = 0.0;
@@ -238,7 +241,7 @@ function init(root) {
       uRes: { value: new THREE.Vector2() }, uDpr: { value: dpr }, uTime: { value: 0 }, uBg: { value: new THREE.Color() },
       uWire: { value: new THREE.Color() }, uWireOpacity: { value: 0.5 }, uWireBlur: { value: 1 }, uWireGlow: { value: 0 }, uGrain: { value: 0 }, uFibers: { value: 0 },
       uExposure: { value: 1 }, uBloom: { value: 1 }, uSparkles: { value: 1 }, uSparkleLength: { value: 150 },
-      uMaskLow: { value: 0.1 }, uMaskHigh: { value: 0.5 }, uRefraction: { value: 1 }, uFilm: { value: 0 }, uFrost: { value: 0 }, uAberration: { value: 1 },
+      uMaskLow: { value: 0.1 }, uMaskHigh: { value: 0.5 }, uRefraction: { value: 1 }, uFilm: { value: 0 }, uFrost: { value: 0 }, uAberration: { value: 1 }, uFill: { value: 0 },
       uStars: { value: Array.from({ length: STARS }, () => new THREE.Vector4()) }
     }
   });
@@ -484,6 +487,7 @@ function init(root) {
     return [lx - w / 2 + e * w, ly + Math.sin(e * Math.PI * 3) * 0.06];
   };
 
+  const filled = { v: 0, to: 0, dur: 2.4 };
   const waves = [];
   const wave = (k = 1, reverse = false) => { waves.push({ t: 0, k, reverse, px: null, py: null }); };
   const runWaves = (dt) => {
@@ -525,6 +529,7 @@ function init(root) {
       pointer.px = pointer.x; pointer.py = pointer.y; pointer.moved = false;
     }
     runWaves(dt);
+    if (filled.v !== filled.to) filled.v = filled.to > filled.v ? Math.min(filled.to, filled.v + dt / filled.dur) : Math.max(filled.to, filled.v - dt / filled.dur);
     step(dt);
 
     rot.x += (P.tiltX - pointer.ny * P.follow * 0.5 - rot.x) * Math.min(dt * 3, 1);
@@ -564,6 +569,7 @@ function init(root) {
     u.uRes.value.set(W * dpr, H * dpr); u.uTime.value = time; u.uBg.value.copy(bg.set(P.background));
     u.uWire.value.set(P.wireColor); u.uWireOpacity.value = P.wireOpacity; u.uWireBlur.value = P.wireBlur; u.uWireGlow.value = P.wireGlow; u.uGrain.value = P.grain; u.uFibers.value = P.fibers;
     u.uExposure.value = P.exposure; u.uBloom.value = P.bloom; u.uSparkles.value = P.sparkles; u.uSparkleLength.value = P.sparkleLength;
+    u.uFill.value = filled.v;
     u.uMaskLow.value = P.maskLow; u.uMaskHigh.value = P.maskHigh; u.uRefraction.value = P.refraction; u.uFilm.value = P.film; u.uFrost.value = P.frost; u.uAberration.value = P.aberration;
     pass(compMat, null);
   };
@@ -573,7 +579,7 @@ function init(root) {
     layout();
   };
 
-  root.logoReveal = { P, sync, wave, rebuild: buildGeometry, replay: () => { intro.on = true; intro.t = 0; } };
+  root.logoReveal = { P, sync, wave, fill: (to = 1, dur = 2.4) => { filled.to = to; filled.dur = dur; }, rebuild: buildGeometry, replay: () => { intro.on = true; intro.t = 0; } };
   new ResizeObserver(resize).observe(root);
   resize();
   new IntersectionObserver(([e]) => { visible = e.isIntersecting && !document.hidden; }).observe(root);
