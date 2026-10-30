@@ -148,19 +148,23 @@ function typeIn(b, delay=0){
 function typeOut(b){ return gsap.to(b,{p:0, duration:RM?.01:Math.min(.55,b.n*.008+.2), ease:'power1.in', onUpdate:()=>paint(b)}); }
 
 const stepEl=CONFIG.counter?(()=>{ const e=document.createElement('div'); e.className='text-m brief-step'; e.setAttribute('aria-hidden','true');
-  e.style.cssText='position:fixed;left:var(--_default---site--margin,20px);top:0;display:grid;overflow:hidden;pointer-events:none;z-index:3;opacity:0';
+  e.style.cssText='position:fixed;left:var(--_default---site--margin,20px);top:0;display:flex;pointer-events:none;z-index:3;opacity:0';
+  e.innerHTML='<span>(</span><span data-d style="display:grid;overflow:hidden"></span><span data-d style="display:grid;overflow:hidden"></span><span>)</span>';
   ROOT.appendChild(e); return e; })():null;
 let stepNow=null;
 function placeStep(top){ if(stepEl) stepEl.style.top=top+'px'; }
+function rollDigit(slot,ch,dir,first){
+  const old=slot.lastElementChild; if(old&&old.textContent===ch) return;
+  const sp=document.createElement('span'); sp.style.cssText='grid-area:1/1;display:block'; sp.textContent=ch; slot.appendChild(sp);
+  gsap.fromTo(sp,{yPercent:110*dir},{yPercent:0,duration:.8,ease:first?'expo.out':'expo.inOut'});
+  if(old) gsap.to(old,{yPercent:-110*dir,duration:.8,ease:'expo.inOut',onComplete:()=>old.remove()});
+}
 function setStep(n,dir=1){
-  if(!stepEl||n===stepNow) return; const prev=stepNow; stepNow=n;
-  const old=stepEl.lastElementChild;
-  if(n==null){ if(old) gsap.to(old,{yPercent:-110*dir,duration:.8,ease:'expo.inOut',onComplete:()=>old.remove()}); return; }
-  const sp=document.createElement('span'); sp.style.cssText='grid-area:1/1;display:block'; sp.textContent='('+String(n).padStart(2,'0')+')'; stepEl.appendChild(sp);
-  gsap.set(stepEl,{opacity:1});
-  if(prev==null||!old){ gsap.fromTo(sp,{yPercent:110},{yPercent:0,duration:.8,ease:'expo.out'}); return; }
-  gsap.fromTo(sp,{yPercent:110*dir},{yPercent:0,duration:.8,ease:'expo.inOut'});
-  gsap.to(old,{yPercent:-110*dir,duration:.8,ease:'expo.inOut',onComplete:()=>old.remove()});
+  if(!stepEl||n===stepNow) return; const first=stepNow==null; stepNow=n;
+  if(n==null){ gsap.to(stepEl,{autoAlpha:0,duration:.5}); return; }
+  const d=String(n).padStart(2,'0'), slots=stepEl.querySelectorAll('[data-d]');
+  if(first) gsap.to(stepEl,{opacity:1,duration:.4});
+  rollDigit(slots[0],d[0],dir,first); rollDigit(slots[1],d[1],dir,first);
 }
 function underY(mob){ return progEl.getBoundingClientRect().top+(mob?2.5:5)*rem()-col.getBoundingClientRect().top; }
 function layout(animate=true, dur=.95){
