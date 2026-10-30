@@ -111,14 +111,13 @@ function textIn(el,delay=0){
 }
 function textOut(el){
   const ls=el._split?el._split.lines:[el];
-  return gsap.to(ls,{yPercent:-110,duration:RM?.01:.5,ease:'power3.in',stagger:.03,onComplete:()=>el.remove()});
+  return gsap.to(ls,{yPercent:-110,duration:RM?.01:.5,ease:'power3.in',stagger:.03}).then(()=>el.remove());
 }
-function say(text){
-  const old=qEl.querySelector('p'); const out=old?textOut(old):null;
+async function say(text){
+  const old=qEl.querySelector('p'); if(old) await textOut(old);
   const el=tpl('msg','p'); el.innerHTML=''; el.style.gridArea='1/1'; text.split('\n').forEach((t,i)=>{ if(i) el.appendChild(document.createElement('br')); el.appendChild(document.createTextNode(t)); });
   el.setAttribute('aria-label',text.replace(/\n/g,' ')); el.style.opacity=0; qEl.appendChild(el);
-  const d=out?out.duration()*.7:0; const tw=textIn(el,d);
-  return d+tw.duration()+.08*(el._split?el._split.lines.length-1:0);
+  return textIn(el).duration();
 }
 function showUI(ui,at){
   const items=[ui, ui._foot].filter(Boolean);
@@ -152,10 +151,10 @@ async function enterStep(i,dir=1){
   busy=true; const st=STEPS[i]; cur=i; setBack(history.length>1); setStep(i+1,dir); clearUI();
   if(dir>0) for(const pre of (st.pre||[])){
     if(st.preProgress!=null) setProgress(st.preProgress);
-    const t=say(typeof pre==='function'?pre(data):pre); await wait(t+CONFIG.holdAuto);
+    const t=await say(typeof pre==='function'?pre(data):pre); await wait(t+CONFIG.holdAuto);
   }
   setProgress(st.progress);
-  const t=say(st.say); const ui=buildUI(st); mountUI(ui);
+  const t=await say(st.say); const ui=buildUI(st); mountUI(ui);
   if(st.id==='feel') refreshPrices(ui);
   gsap.set([ui,ui._foot].filter(Boolean),{autoAlpha:0});
   showUI(ui,t-.5); await wait(Math.max(.2,t-.5)); busy=false;
@@ -267,7 +266,7 @@ async function submit(){
   setProgress(100); clearUI(); setStep(null);
   React.submit(); await wait(.6);
   const first=(data.name||'').split(' ')[0];
-  const t=say(CONFIG.finalText.replace('{name}', first?', '+first:''));
+  const t=await say(CONFIG.finalText.replace('{name}', first?', '+first:''));
   const cta=$('[data-brief-cta]'); if(cta){ cta.style.gridArea='1/1'; footEl.appendChild(cta); gsap.fromTo(cta,{autoAlpha:0,y:12},{autoAlpha:1,y:0,duration:.6,ease:'power3.out',delay:t-.4}); }
 }
 
