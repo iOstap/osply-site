@@ -282,7 +282,7 @@ async function init(title) {
   };
   const resize = () => {
     W = title.clientWidth; H = title.clientHeight;
-    padX = Math.round(H * 0.25); padT = Math.round(H * 0.45); padB = Math.round(H * 1.15);
+    padX = Math.round(H * 0.25); padT = Math.round(H * 0.15); padB = Math.round(H * 0.15);
     CW = W + padX * 2; CH = H + padT + padB;
     Object.assign(canvas.style, { left: -padX + 'px', top: -padT + 'px', width: CW + 'px', height: CH + 'px' });
     renderer.setSize(CW, CH, false);
@@ -376,7 +376,7 @@ async function init(title) {
     if (!gsap) return;
     letters.forEach((L, i) => {
       const b = boxes[i], img = imgs[i];
-      const yp = parseFloat(gsap.getProperty(img, 'yPercent')) || 0;
+      const yp = (parseFloat(gsap.getProperty(img, 'yPercent')) || 0) + (parseFloat(gsap.getProperty(img, 'y')) || 0) / b.h * 100;
       const rx = parseFloat(gsap.getProperty(img, 'rotationX')) || 0;
       const sx = b.w / L.w, sy = b.h / L.h;
       L.holder.position.set(b.x + b.w / 2 - W / 2, H / 2 - (b.y + b.h / 2) - yp / 100 * b.h, 0);
