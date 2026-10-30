@@ -18,7 +18,7 @@ function init(root) {
   const P = {
     background: getComputedStyle(document.documentElement).getPropertyValue('--color--background').trim() || '#0e0e0e',
     logoX: 0.5,
-    logoY: 0.17,
+    logoY: 0.5,
     logoWidth: 0.9,
     depth: 4,
     tiltX: -0.3,
@@ -383,7 +383,7 @@ function init(root) {
     const box = new THREE.Vector3();
     geometry.boundingBox.getSize(box);
     pivot.scale.setScalar(Math.min((mobile ? vw * 0.92 : vw * P.logoWidth) / box.x, vh * 0.6 / box.y));
-    pivot.position.set(mobile ? 0 : -vw / 2 + vw * P.logoX, vh / 2 - vh * (mobile ? 0.12 : P.logoY), 0);
+    pivot.position.set(mobile ? 0 : -vw / 2 + vw * P.logoX, vh / 2 - vh * P.logoY, 0);
   };
 
   const splat = (x, y, dx, dy, amount) => {
@@ -437,7 +437,7 @@ function init(root) {
   const intro = { on: P.intro, t: 0 };
   const introPath = (t) => {
     const mobile = aspect < 0.8;
-    const lx = mobile ? 0.5 : P.logoX, ly = 1 - (mobile ? 0.12 : P.logoY), w = mobile ? 0.92 : P.logoWidth;
+    const lx = mobile ? 0.5 : P.logoX, ly = 1 - P.logoY, w = mobile ? 0.92 : P.logoWidth;
     const e = t * t * (3 - 2 * t);
     return [lx - w / 2 + e * w, ly + Math.sin(e * Math.PI * 3) * 0.06];
   };
