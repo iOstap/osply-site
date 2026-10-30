@@ -11,7 +11,6 @@ const CONFIG = {
   contact: D.contact || 'email',
   finalText: D.final || 'All set{name}. I’ll get back to you with a tailored proposal within a few hours.',
   source: D.source || '',
-  holdAuto: 1.1,
 };
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -77,9 +76,9 @@ const contactStep = CONFIG.contact==='name'
 const STEPS=[
   { id:'intro', progress:0, say:'Hey, I’m PUFF, OSPLY’s\nvery inflated assistant.\nGot a project in mind?',
     ui:{type:'choice', key:'_start', options:[{label:'Start a project', value:'start'}]}, onAnswer:()=>React.spin() },
-  { id:'project', progress:10, pre:['Ooh, a new project. My\nfavorite kind of air.'], say:'First things first:\nwhat should we call\nyour project?',
+  { id:'project', progress:10, say:'First things first:\nwhat should we call\nyour project?',
     ui:{type:'text', fields:[{key:'project', placeholder:'Project or brand name', required:true, autocomplete:'organization'}]} },
-  { id:'kind', preProgress:20, progress:20, pre:[d=>`${d.project}. Has\na ring to it.`], say:'Are we building\nsomething new, or giving\nan existing site a glow-up?',
+  { id:'kind', progress:20, say:'Are we building\nsomething new, or giving\nan existing site a glow-up?',
     ui:{type:'choice', key:'kind', options:[{label:'Something new',value:'new'},{label:'A redesign',value:'redesign'}]} },
   { id:'size', progress:30, say:'How big are we\ntalking?',
     ui:{type:'choice', key:'size', fixed:true, options:[{label:'Landing page',sub:'1 page',value:'landing'},{label:'Website',sub:'2–5 pages',value:'website-s'},{label:'Website',sub:'6–12 pages',value:'website-m'},{label:'Bigger than that',value:'large'}]} },
@@ -149,10 +148,6 @@ function setProgress(v){ gsap.to(prog,{v,duration:.9,ease:'expo.inOut',onUpdate(
 
 async function enterStep(i,dir=1){
   busy=true; const st=STEPS[i]; cur=i; setBack(history.length>1); setStep(i+1,dir); clearUI();
-  if(dir>0) for(const pre of (st.pre||[])){
-    if(st.preProgress!=null) setProgress(st.preProgress);
-    const t=await say(typeof pre==='function'?pre(data):pre); await wait(t+CONFIG.holdAuto);
-  }
   setProgress(st.progress);
   const t=await say(st.say); const ui=buildUI(st); mountUI(ui);
   if(st.id==='feel') refreshPrices(ui);
