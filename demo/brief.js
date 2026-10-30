@@ -15,6 +15,8 @@ const CONFIG = {
   holdAuto: .85,
   anchor: parseFloat(D.anchor) || .5,
   gap: D.gap ? parseFloat(D.gap) : 4,
+  under: D.place === 'under',
+  history: D.history !== '0',
 };
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const smooth=(x,a,b)=>{ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); };
@@ -144,18 +146,19 @@ function typeIn(b, delay=0){
 }
 function typeOut(b){ return gsap.to(b,{p:0, duration:RM?.01:Math.min(.55,b.n*.008+.2), ease:'power1.in', onUpdate:()=>paint(b)}); }
 
+function underY(mob){ return progEl.getBoundingClientRect().bottom+(mob?2.5:5)*rem()-col.getBoundingClientRect().top; }
 function layout(animate=true, dur=.95){
   const mob=MOB(), center=col.clientHeight*(mob?.52:CONFIG.anchor), gap=(mob?2.5:CONFIG.gap)*rem(), S2=.5; let y=null;
   for(let k=stack.length-1;k>=0;k--){
     const b=stack[k], h=b.el.offsetHeight, role=stack.length-1-k; let to;
-    if(role===0){ y=mob?innerHeight*MOB_TOP-col.offsetTop:center-h; to={y, scale:1, filter:'blur(0px)', opacity:1}; b.top=y; b.h=h; placeUI(b); }
-    else { y=y-gap-h*S2; to={y, scale:S2, filter:role===1?'blur(5px)':'blur(14px)', opacity:role===1&&!mob?.9:0}; }
+    if(role===0){ y=CONFIG.under?underY(mob):mob?innerHeight*MOB_TOP-col.offsetTop:center-h; to={y, scale:1, filter:'blur(0px)', opacity:1}; b.top=y; b.h=h; placeUI(b); }
+    else { y=y-gap-h*S2; to={y, scale:S2, filter:role===1?'blur(5px)':'blur(14px)', opacity:role===1&&!mob&&CONFIG.history?.9:0}; }
     if(!b.placed){ b.placed=true; gsap.set(b.el,to); continue; }
     if(animate) gsap.to(b.el,{...to, duration:dur, ease:'expo.inOut', overwrite:'auto'}); else gsap.set(b.el,to);
   }
 }
 function textW(el){ const r=document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width/(gsap.getProperty(el,'scale')||1); }
-function placeUI(b){ if(!b||!b.ui) return; b.ui.style.top = (MOB() || CONFIG.anchor!==.5) && b.top!=null ? (b.top+b.h+(b.ui.classList.contains('is-cards')?1:2)*rem())+'px' : '';
+function placeUI(b){ if(!b||!b.ui) return; b.ui.style.top = (MOB() || CONFIG.under || CONFIG.anchor!==.5) && b.top!=null ? (b.top+b.h+(b.ui.classList.contains('is-cards')?1:2)*rem())+'px' : '';
   const wide=b.ui.querySelectorAll('[data-fit]'); if(wide.length){ const w=MOB()?'':Math.ceil(textW(b.el))+'px'; wide.forEach(n=>{ n.style.width=w; n.style.maxWidth=w?'none':''; }); } }
 function showUI(b,at){
   if(!b.ui) return;
@@ -312,6 +315,7 @@ async function submit(){
 }
 
 addEventListener('resize',()=>{ if(typing()) return; layout(false); });
+addEventListener('logoreveal:layout',()=>{ if(typing()) return; layout(false); });
 document.addEventListener('focusout',()=>{ if(!matchMedia('(pointer:coarse)').matches) return; setTimeout(()=>{ if(typing()) return; window.scrollTo(0,0); document.documentElement.scrollTop=0; document.body.scrollTop=0; layout(false); },60); });
 addEventListener('keydown',e=>{ if(e.key==='Escape') goBack(); });
 (document.fonts?document.fonts.ready:Promise.resolve()).then(()=>enterStep(0));

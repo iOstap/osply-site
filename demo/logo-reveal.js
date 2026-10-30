@@ -381,8 +381,45 @@ function init(root) {
     layout();
   };
 
+  const fit = { on: root.dataset.logoFit === 'top', x: 0.5, y: 0.5, w: 0.9 };
+  const corners = Array.from({ length: 8 }, () => new THREE.Vector3());
+  const screenBox = () => {
+    const b = geometry.boundingBox;
+    let l = Infinity, r = -Infinity, t = Infinity, btm = -Infinity;
+    scene.updateMatrixWorld();
+    corners.forEach((c, i) => {
+      c.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(logo.matrixWorld).project(camera);
+      const x = (c.x * 0.5 + 0.5) * W, y = (0.5 - c.y * 0.5) * H;
+      l = Math.min(l, x); r = Math.max(r, x); t = Math.min(t, y); btm = Math.max(btm, y);
+    });
+    return { l, r, t, b: btm };
+  };
+  const layoutFit = (vh) => {
+    const cs = getComputedStyle(root);
+    const pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0, pt = parseFloat(cs.paddingTop) || 0;
+    const tw = W - pl - pr, px = vh / H;
+    pivot.rotation.set(P.tiltX, P.tiltY, 0);
+    logo.position.y = 0;
+    pivot.position.set(0, 0, 0);
+    let sc = 1;
+    pivot.scale.setScalar(sc);
+    for (let i = 0; i < 6; i++) {
+      let bx = screenBox();
+      sc *= tw / (bx.r - bx.l);
+      pivot.scale.setScalar(sc);
+      bx = screenBox();
+      pivot.position.x += (pl + tw / 2 - (bx.l + bx.r) / 2) * px;
+      pivot.position.y -= (pt + (bx.b - bx.t) / 2 - (bx.t + bx.b) / 2) * px;
+    }
+    const bx = screenBox();
+    fit.x = (bx.l + bx.r) / 2 / W; fit.y = (bx.t + bx.b) / 2 / H; fit.w = (bx.r - bx.l) / W;
+    document.documentElement.style.setProperty('--logo-bottom', `${Math.round(bx.b)}px`);
+    dispatchEvent(new CustomEvent('logoreveal:layout', { detail: bx }));
+  };
+
   const layout = () => {
     const vh = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z;
+    if (fit.on) return layoutFit(vh);
     const vw = vh * aspect;
     const mobile = aspect < 0.8;
     const box = new THREE.Vector3();
@@ -442,7 +479,7 @@ function init(root) {
   const intro = { on: P.intro, t: 0 };
   const introPath = (t) => {
     const mobile = aspect < 0.8;
-    const lx = mobile ? 0.5 : P.logoX, ly = 1 - (mobile ? P.logoYMobile : P.logoY), w = mobile ? 0.92 : P.logoWidth;
+    const lx = fit.on ? fit.x : mobile ? 0.5 : P.logoX, ly = 1 - (fit.on ? fit.y : mobile ? P.logoYMobile : P.logoY), w = fit.on ? fit.w : mobile ? 0.92 : P.logoWidth;
     const e = t * t * (3 - 2 * t);
     return [lx - w / 2 + e * w, ly + Math.sin(e * Math.PI * 3) * 0.06];
   };
@@ -464,7 +501,7 @@ function init(root) {
   };
 
   const tmp = new THREE.Vector3();
-  const rot = { x: 0, y: 0 };
+  const rot = { x: P.tiltX, y: P.tiltY };
   const bg = new THREE.Color();
   let last = performance.now(), time = 0, visible = true, raf = 0;
 
