@@ -2,8 +2,9 @@
 import * as THREE from 'three';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 
+const FONT = '"IBM Plex Mono", ui-monospace, monospace';
 const root = document.querySelector('[data-logo-reveal]');
-if (root) init(root);
+if (root) (document.fonts ? document.fonts.load(`400 64px ${FONT}`) : Promise.resolve()).catch(() => {}).then(() => init(root));
 
 function init(root) {
   const LOGO = 'M17.6 0C21.1346 0 24 2.86538 24 6.4V10.0519C24 10.9006 23.6629 11.7145 23.0627 12.3146L12.3146 23.0627C11.7145 23.6629 10.9006 24 10.0519 24H6.4C2.86538 24 1.80416e-07 21.1346 0 17.6L0 14.0322C0 13.1835 0.337142 12.3696 0.937258 11.7695L11.7695 0.937259C12.3696 0.337142 13.1835 0 14.0322 0L17.6 0ZM8.96 5.76C7.19269 5.76 5.76 7.19269 5.76 8.96V15.04C5.76 16.8074 7.19269 18.24 8.96 18.24H15.04C16.8074 18.24 18.24 16.8074 18.24 15.04V8.96C18.24 7.19269 16.8074 5.76 15.04 5.76H8.96Z';
@@ -17,10 +18,12 @@ function init(root) {
     tiltY: -0.1,
     follow: 0.8,
     mode: 'ascii',
-    asciiSize: 11,
-    asciiGain: 1.2,
-    asciiContrast: 2,
-    asciiEnv: 0.9,
+    asciiSize: 6,
+    asciiGain: 1,
+    asciiContrast: 1.5,
+    asciiEdge: 3,
+    asciiLight: 1,
+    asciiRough: 0.32,
     asciiColor: '#d9d9d9',
     asciiOpacity: 0.9,
     wireColor: '#d9d9d9',
@@ -152,67 +155,90 @@ function init(root) {
     }`,
     { uTexture: { value: null }, dir: { value: new THREE.Vector2() } });
 
-  const CHARS = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
-  const CIRCLES = [[0.28, 0.2], [0.28, 0.52], [0.28, 0.84], [0.72, 0.16], [0.72, 0.48], [0.72, 0.8]];
+  const CHARS = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join('');
+  const INNER = [[0.28, 0.26], [0.72, 0.14], [0.28, 0.56], [0.72, 0.44], [0.28, 0.86], [0.72, 0.74]];
+  const LINE = 1.6;
   const atlas = (() => {
-    const fs = 64, cols = 16, rows = Math.ceil(CHARS.length / cols);
-    const font = `${fs}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+    const cellH = 64, cellW = Math.max(Math.round(cellH / LINE), 8), pad = 8;
+    const padW = cellW + pad * 2, padH = cellH + pad * 2;
+    const cols = Math.ceil(Math.sqrt(CHARS.length)), rows = Math.ceil(CHARS.length / cols);
     const cv = document.createElement('canvas');
+    cv.width = cols * padW; cv.height = rows * padH;
     const cx = cv.getContext('2d', { willReadFrequently: true });
-    cx.font = font;
-    const gw = Math.ceil(cx.measureText('M').width), gh = Math.ceil(fs * 1.25);
-    cv.width = gw * cols; cv.height = gh * rows;
-    cx.font = font; cx.fillStyle = '#fff'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-    [...CHARS].forEach((ch, i) => cx.fillText(ch, (i % cols + 0.5) * gw, (Math.floor(i / cols) + 0.5) * gh + fs * 0.04));
-    const px = cx.getImageData(0, 0, cv.width, cv.height).data;
-    const r = gw * 0.22;
-    const vecs = [...CHARS].map((ch, i) => CIRCLES.map(([u, v]) => {
-      const ox = (i % cols + u) * gw, oy = (Math.floor(i / cols) + v) * gh;
-      let sum = 0, n = 0;
-      for (let y = Math.floor(oy - r); y <= oy + r; y++) for (let x = Math.floor(ox - r); x <= ox + r; x++) {
-        if ((x - ox) ** 2 + (y - oy) ** 2 > r * r) continue;
-        sum += px[(y * cv.width + x) * 4 + 3] / 255; n++;
-      }
-      return sum / n;
-    }));
-    const max = CIRCLES.map((_, k) => Math.max(...vecs.map((v) => v[k])) || 1);
-    const data = new Float32Array(CHARS.length * 8);
-    vecs.forEach((v, i) => v.forEach((c, k) => { data[(k < 4 ? i * 4 : (CHARS.length + i) * 4) + (k % 4)] = c / max[k]; }));
-    const shapes = new THREE.DataTexture(data, CHARS.length, 2, THREE.RGBAFormat, THREE.FloatType);
+    cx.fillStyle = '#fff'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.font = `400 ${Math.floor(Math.min(cellH * 0.92, cellW / 0.58))}px ${FONT}`;
+    [...CHARS].forEach((ch, i) => cx.fillText(ch, (i % cols) * padW + padW / 2, Math.floor(i / cols) * padH + padH / 2));
+    const img = cx.getImageData(0, 0, cv.width, cv.height);
+    const n = INNER.length, vec = new Float32Array(CHARS.length * n), r = cellH * 0.26;
+    for (let g = 0; g < CHARS.length; g++) {
+      const ox = (g % cols) * padW + pad, oy = Math.floor(g / cols) * padH + pad;
+      INNER.forEach(([u, v], k) => {
+        const px = u * cellW, py = v * cellH;
+        let sum = 0, total = 0;
+        for (let y = Math.floor(py - r); y <= Math.ceil(py + r); y++) for (let x = Math.floor(px - r); x <= Math.ceil(px + r); x++) {
+          const dx = x + 0.5 - px, dy = y + 0.5 - py;
+          if (dx * dx + dy * dy > r * r) continue;
+          total++;
+          if (x < -pad || y < -pad || x >= cellW + pad || y >= cellH + pad) continue;
+          sum += img.data[((oy + y) * img.width + ox + x) * 4 + 3];
+        }
+        vec[g * n + k] = total ? sum / (total * 255) : 0;
+      });
+    }
+    for (let k = 0; k < n; k++) {
+      let peak = 0;
+      for (let g = 0; g < CHARS.length; g++) peak = Math.max(peak, vec[g * n + k]);
+      if (peak > 0) for (let g = 0; g < CHARS.length; g++) vec[g * n + k] /= peak;
+    }
+    const shapes = new THREE.DataTexture(vec, n, CHARS.length, THREE.RedFormat, THREE.FloatType);
     shapes.needsUpdate = true;
     const tex = new THREE.CanvasTexture(cv);
-    tex.premultiplyAlpha = false;
-    return { tex, shapes, rows, aspect: gw / gh };
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    return { tex, shapes, grid: new THREE.Vector2(cols, rows), pad: new THREE.Vector2(pad / padW, pad / padH), inner: new THREE.Vector2(cellW / padW, cellH / padH) };
   })();
 
   const cellMat = mat(`
-    uniform sampler2D tA; uniform sampler2D uShapes; uniform vec2 uRes; uniform vec2 uCellPx; uniform int uCount; uniform float uContrast; uniform float uGain;
-    const vec2 C[6] = vec2[6](${CIRCLES.map(([u, v]) => `vec2(${u.toFixed(2)}, ${v.toFixed(2)})`).join(', ')});
-    float circle(vec2 p, float r){
-      float s = 0.0;
-      for (int i = 0; i < 7; i++) {
-        vec2 o = i == 0 ? vec2(0.0) : vec2(cos(float(i) * 1.0472), sin(float(i) * 1.0472)) * r * 0.65;
-        vec4 t = texture2D(tA, (p + o) / uRes);
-        s += dot(pow(max(t.rgb, 0.0), vec3(0.4545)), vec3(0.299, 0.587, 0.114)) * t.a;
-      }
-      return s / 7.0;
+    uniform sampler2D tScene; uniform sampler2D tShapes; uniform vec2 uResolution; uniform vec2 uCellPx; uniform int uGlyphCount;
+    uniform float uGain; uniform float uContrast; uniform float uEdgeContrast;
+    const vec2 INNER[6] = vec2[6](vec2(0.28, 0.26), vec2(0.72, 0.14), vec2(0.28, 0.56), vec2(0.72, 0.44), vec2(0.28, 0.86), vec2(0.72, 0.74));
+    const vec2 OUTER[10] = vec2[10](vec2(0.28, -0.2), vec2(0.72, -0.2), vec2(-0.22, 0.25), vec2(1.22, 0.25), vec2(-0.22, 0.5), vec2(1.22, 0.5), vec2(-0.22, 0.75), vec2(1.22, 0.75), vec2(0.28, 1.2), vec2(0.72, 1.2));
+    const vec2 RING[6] = vec2[6](vec2(1.0, 0.0), vec2(0.5, 0.8660254), vec2(-0.5, 0.8660254), vec2(-1.0, 0.0), vec2(-0.5, -0.8660254), vec2(0.5, -0.8660254));
+    vec2 cellBase;
+    vec4 tap(vec2 p){ vec2 uv = p / uResolution; if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return vec4(0.0); return texture2D(tScene, uv); }
+    vec4 circle(vec2 c){
+      vec2 mid = cellBase + vec2(c.x, 1.0 - c.y) * uCellPx;
+      float r = uCellPx.y * 0.161;
+      vec4 acc = tap(mid);
+      for (int k = 0; k < 6; k++) acc += tap(mid + RING[k] * r);
+      return acc / 7.0;
     }
+    float lum(vec4 acc){ return clamp(dot(acc.rgb / max(acc.a, 1e-4), vec3(0.2126, 0.7152, 0.0722)) * uGain, 0.0, 1.0) * acc.a; }
+    float dirContrast(float v, float ext){ float peak = max(v, ext); if (peak < 1e-4) return v; return pow(v / peak, uEdgeContrast) * peak; }
     void main(){
-      vec2 origin = floor(gl_FragCoord.xy) * uCellPx;
-      float v[6]; float mx = 0.0;
-      for (int i = 0; i < 6; i++) { v[i] = clamp(circle(origin + vec2(C[i].x, 1.0 - C[i].y) * uCellPx, uCellPx.x * 0.22) * uGain, 0.0, 1.0); mx = max(mx, v[i]); }
-      if (mx > 0.0) for (int i = 0; i < 6; i++) v[i] = pow(v[i] / mx, uContrast) * mx;
-      float best = 1e9; int bi = 0;
-      for (int k = 0; k < 96; k++) {
-        if (k >= uCount) break;
-        vec4 a = texelFetch(uShapes, ivec2(k, 0), 0); vec4 b = texelFetch(uShapes, ivec2(k, 1), 0);
-        vec3 d1 = vec3(v[0], v[1], v[2]) - a.xyz; vec3 d2 = vec3(v[3], v[4], v[5]) - vec3(a.w, b.xy);
-        float d = dot(d1, d1) + dot(d2, d2);
-        if (d < best) { best = d; bi = k; }
+      cellBase = floor(gl_FragCoord.xy) * uCellPx;
+      float v[6];
+      for (int i = 0; i < 6; i++) v[i] = lum(circle(INNER[i]));
+      float e[10];
+      for (int i = 0; i < 10; i++) e[i] = lum(circle(OUTER[i]));
+      v[0] = dirContrast(v[0], max(max(e[0], e[1]), max(e[2], e[4])));
+      v[1] = dirContrast(v[1], max(max(e[0], e[1]), max(e[3], e[5])));
+      v[2] = dirContrast(v[2], max(e[2], max(e[4], e[6])));
+      v[3] = dirContrast(v[3], max(e[3], max(e[5], e[7])));
+      v[4] = dirContrast(v[4], max(max(e[4], e[6]), max(e[8], e[9])));
+      v[5] = dirContrast(v[5], max(max(e[5], e[7]), max(e[8], e[9])));
+      float peak = max(max(max(v[0], v[1]), max(v[2], v[3])), max(v[4], v[5]));
+      if (peak > 1e-4) for (int i = 0; i < 6; i++) v[i] = pow(v[i] / peak, uContrast) * peak;
+      int best = 0; float bestD = 1e9;
+      for (int g = 0; g < 128; g++) {
+        if (g >= uGlyphCount) break;
+        float d = 0.0;
+        for (int i = 0; i < 6; i++) { float diff = v[i] - texelFetch(tShapes, ivec2(i, g), 0).r; d += diff * diff; }
+        if (d < bestD) { bestD = d; best = g; }
       }
-      gl_FragColor = vec4(float(bi), 0.0, 0.0, 1.0);
+      gl_FragColor = vec4(float(best), 0.0, 0.0, 1.0);
     }`,
-    { tA: { value: null }, uShapes: { value: atlas.shapes }, uRes: { value: new THREE.Vector2() }, uCellPx: { value: new THREE.Vector2() }, uCount: { value: CHARS.length }, uContrast: { value: 2 }, uGain: { value: 1 } });
+    { tScene: { value: null }, tShapes: { value: atlas.shapes }, uResolution: { value: new THREE.Vector2() }, uCellPx: { value: new THREE.Vector2() }, uGlyphCount: { value: CHARS.length }, uGain: { value: 1 }, uContrast: { value: 1.5 }, uEdgeContrast: { value: 3 } });
 
   const STARS = 7;
   const compMat = new THREE.ShaderMaterial({
@@ -222,7 +248,7 @@ function init(root) {
       varying vec2 vUv;
       uniform sampler2D tA; uniform sampler2D tB; uniform sampler2D tBloom1; uniform sampler2D tBloom2; uniform sampler2D tDye; uniform sampler2D tVel;
       uniform vec2 uRes; uniform float uDpr; uniform float uTime; uniform vec3 uBg;
-      uniform float uMode; uniform sampler2D tCells; uniform sampler2D tAtlas; uniform vec2 uCellPx; uniform vec2 uCells; uniform float uAtlasRows; uniform vec3 uAscii; uniform float uAsciiOpacity;
+      uniform float uMode; uniform sampler2D tCells; uniform sampler2D tAtlas; uniform vec2 uCellPx; uniform vec2 uCells; uniform vec2 uAtlasGrid; uniform vec2 uAtlasPad; uniform vec2 uAtlasInner; uniform vec3 uAscii; uniform float uAsciiOpacity;
       uniform vec3 uWire; uniform float uWireOpacity; uniform float uWireBlur; uniform float uWireGlow; uniform float uGrain; uniform float uFibers;
       uniform float uExposure; uniform float uBloom; uniform float uSparkles; uniform float uSparkleLength;
       uniform float uMaskLow; uniform float uMaskHigh; uniform float uRefraction; uniform float uFilm; uniform float uFrost; uniform float uAberration;
@@ -243,11 +269,14 @@ function init(root) {
         float layer = 0.0;
         vec3 layerColor = uWire;
         if (uMode > 0.5) {
-          vec2 ci = floor(frag / uCellPx);
-          float idx = floor(texture2D(tCells, (ci + 0.5) / uCells).r + 0.5);
-          vec2 lp = fract(frag / uCellPx);
-          vec2 g = vec2(mod(idx, 16.0), floor(idx / 16.0));
-          layer = texture2D(tAtlas, vec2((g.x + lp.x) / 16.0, 1.0 - (g.y + 1.0 - lp.y) / uAtlasRows)).a * uAsciiOpacity;
+          vec2 cellPos = frag / uCellPx;
+          vec2 cell = clamp(floor(cellPos), vec2(0.0), uCells - 1.0);
+          float glyph = floor(texelFetch(tCells, ivec2(cell), 0).r + 0.5);
+          vec2 local = clamp(cellPos - cell, 0.0, 1.0);
+          vec2 gp = vec2(mod(glyph, uAtlasGrid.x), floor(glyph / uAtlasGrid.x));
+          vec2 auv = vec2((gp.x + uAtlasPad.x + local.x * uAtlasInner.x) / uAtlasGrid.x, (uAtlasGrid.y - gp.y - 1.0 + uAtlasPad.y + local.y * uAtlasInner.y) / uAtlasGrid.y);
+          vec2 st = uAtlasInner / uAtlasGrid;
+          layer = textureGrad(tAtlas, auv, dFdx(cellPos) * st, dFdy(cellPos) * st).a * uAsciiOpacity;
           layerColor = uAscii;
         } else {
           float glow = 0.0;
@@ -303,7 +332,7 @@ function init(root) {
     uniforms: {
       tA: { value: null }, tB: { value: null }, tBloom1: { value: null }, tBloom2: { value: null }, tDye: { value: null }, tVel: { value: null },
       uRes: { value: new THREE.Vector2() }, uDpr: { value: dpr }, uTime: { value: 0 }, uBg: { value: new THREE.Color() },
-      uMode: { value: 1 }, tCells: { value: null }, tAtlas: { value: atlas.tex }, uCellPx: { value: new THREE.Vector2() }, uCells: { value: new THREE.Vector2() }, uAtlasRows: { value: atlas.rows }, uAscii: { value: new THREE.Color() }, uAsciiOpacity: { value: 1 },
+      uMode: { value: 1 }, tCells: { value: null }, tAtlas: { value: atlas.tex }, uCellPx: { value: new THREE.Vector2() }, uCells: { value: new THREE.Vector2() }, uAtlasGrid: { value: atlas.grid }, uAtlasPad: { value: atlas.pad }, uAtlasInner: { value: atlas.inner }, uAscii: { value: new THREE.Color() }, uAsciiOpacity: { value: 1 },
       uWire: { value: new THREE.Color() }, uWireOpacity: { value: 0.5 }, uWireBlur: { value: 1 }, uWireGlow: { value: 0 }, uGrain: { value: 0 }, uFibers: { value: 0 },
       uExposure: { value: 1 }, uBloom: { value: 1 }, uSparkles: { value: 1 }, uSparkleLength: { value: 150 },
       uMaskLow: { value: 0.1 }, uMaskHigh: { value: 0.5 }, uRefraction: { value: 1 }, uFilm: { value: 0 }, uFrost: { value: 0 }, uAberration: { value: 1 },
@@ -388,7 +417,23 @@ function init(root) {
     wire.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
     solid.dispose();
   };
-  const matA = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.85, roughness: 0.24, envMap: envChrome, envMapIntensity: P.asciiEnv });
+  const matA = new THREE.ShaderMaterial({
+    uniforms: { uRough: { value: 0.32 }, uLight: { value: 1 } },
+    vertexShader: `varying vec3 vNormal; varying vec3 vWorld; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; vNormal = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `
+      varying vec3 vNormal; varying vec3 vWorld; uniform float uRough; uniform float uLight;
+      const vec3 KEY = normalize(vec3(-0.45, 0.85, 0.45));
+      const vec3 RIM = normalize(vec3(0.62, -0.12, -0.75));
+      vec3 studio(vec3 d){ float up = d.y * 0.5 + 0.5; return mix(vec3(0.05), vec3(0.4), up * up) + pow(max(dot(d, KEY), 0.0), 6.0) * 1.85 + pow(max(dot(d, RIM), 0.0), 40.0) * 4.5; }
+      vec3 aces(vec3 x){ return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
+      vec3 srgb(vec3 c){ return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }
+      void main(){
+        vec3 n = normalize(vNormal); vec3 v = normalize(cameraPosition - vWorld);
+        vec3 lobe = normalize(mix(reflect(-v, n), n, uRough));
+        float fresnel = 0.05 + 0.95 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 4.0);
+        gl_FragColor = vec4(srgb(aces((studio(n) * 0.6 + studio(lobe) * fresnel * 1.35) * uLight)), 1.0);
+      }`
+  });
   const matB = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(P.chromeTint), metalness: 1, roughness: P.chromeRoughness, envMap: envChrome, envMapIntensity: P.chromeEnv, clearcoat: 1, clearcoatRoughness: 0.05 });
   const key = new THREE.DirectionalLight(0xffffff, 2.2);
   key.position.set(-3, 5, 6);
@@ -423,7 +468,7 @@ function init(root) {
 
   let W = 1, H = 1, aspect = 1;
   let rtA, rtB, rtCells, bloom1a, bloom1b, bloom2a, bloom2b;
-  const cellPx = new THREE.Vector2();
+  const cellPx = new THREE.Vector2(), sceneCell = new THREE.Vector2();
   let velocity, dye, pressure, divergence, curlRT;
   const SIM = 128, DYE = 512;
   const simTexel = new THREE.Vector2(), dyeTexel = new THREE.Vector2();
@@ -434,10 +479,12 @@ function init(root) {
     renderer.setSize(W, H, false);
     const w = Math.floor(W * dpr), h = Math.floor(H * dpr);
     [rtA, rtB, rtCells, bloom1a, bloom1b, bloom2a, bloom2b].forEach((r) => r && r.dispose());
-    const ra = P.mode === 'ascii' ? 0.5 : P.wireRes;
-    rtA = rt(Math.max(1, Math.round(w * ra)), Math.max(1, Math.round(h * ra)), { samples: 4, depthBuffer: true });
-    cellPx.set(P.asciiSize * dpr * atlas.aspect, P.asciiSize * dpr);
-    rtCells = rt(Math.ceil(w / cellPx.x), Math.ceil(h / cellPx.y), { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    const cw = P.asciiSize, ch = P.asciiSize * LINE;
+    const ra = P.mode === 'ascii' ? 12 / ch : P.wireRes * dpr;
+    rtA = rt(Math.max(1, Math.round(W * ra)), Math.max(1, Math.round(H * ra)), { samples: 4, depthBuffer: true });
+    sceneCell.set(cw * 12 / ch, 12);
+    cellPx.set(cw * dpr, ch * dpr);
+    rtCells = rt(Math.max(1, Math.ceil(W / cw)), Math.max(1, Math.ceil(H / ch)), { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     rtB = rt(w, h, { samples: 4, depthBuffer: true });
     bloom1a = rt(w >> 2, h >> 2); bloom1b = rt(w >> 2, h >> 2);
     bloom2a = rt(w >> 3, h >> 3); bloom2b = rt(w >> 3, h >> 3);
@@ -557,8 +604,9 @@ function init(root) {
     logo.material = matB;
     matB.visible = true; wire.visible = false;
     if (ascii) {
-      cellMat.uniforms.tA.value = rtA.texture; cellMat.uniforms.uRes.value.set(W * dpr, H * dpr); cellMat.uniforms.uCellPx.value.copy(cellPx);
-      cellMat.uniforms.uContrast.value = P.asciiContrast; cellMat.uniforms.uGain.value = P.asciiGain;
+      const c = cellMat.uniforms;
+      c.tScene.value = rtA.texture; c.uResolution.value.set(rtA.width, rtA.height); c.uCellPx.value.copy(sceneCell);
+      c.uGain.value = P.asciiGain; c.uContrast.value = P.asciiContrast; c.uEdgeContrast.value = P.asciiEdge;
       pass(cellMat, rtCells);
     }
     renderer.setRenderTarget(rtB); renderer.clear(); renderer.render(scene, camera);
@@ -595,7 +643,7 @@ function init(root) {
   };
 
   const sync = () => {
-    matA.envMapIntensity = P.asciiEnv;
+    matA.uniforms.uLight.value = P.asciiLight; matA.uniforms.uRough.value = P.asciiRough;
     matB.color.set(P.chromeTint); matB.roughness = P.chromeRoughness; matB.envMapIntensity = P.chromeEnv;
     layout();
   };
@@ -619,10 +667,12 @@ function init(root) {
       f1.add(P, 'follow', 0, 1, 0.01);
       gui.add(P, 'mode', ['ascii', 'wire']).onChange(resize);
       const fa = gui.addFolder('ASCII');
-      fa.add(P, 'asciiSize', 5, 28, 0.5).onFinishChange(resize);
+      fa.add(P, 'asciiSize', 3, 20, 0.5).onFinishChange(resize);
       fa.add(P, 'asciiGain', 0.2, 3, 0.01);
       fa.add(P, 'asciiContrast', 0.5, 5, 0.01);
-      fa.add(P, 'asciiEnv', 0, 3, 0.01).onChange(sync);
+      fa.add(P, 'asciiEdge', 0.5, 6, 0.01);
+      fa.add(P, 'asciiLight', 0.2, 3, 0.01).onChange(sync);
+      fa.add(P, 'asciiRough', 0, 1, 0.01).onChange(sync);
       fa.addColor(P, 'asciiColor');
       fa.add(P, 'asciiOpacity', 0, 1, 0.01);
       const f2 = gui.addFolder('Wireframe');
