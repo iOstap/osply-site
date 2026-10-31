@@ -9,8 +9,8 @@ import * as THREE from 'three';
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   var P = window.logoWarp = {
-    simHeight: 64, pad: 0.35, radius: 0.02, force: 5000, amount: 0.0011,
-    velocityFade: 2.5, pressure: 0.8, iterations: 14, idle: 2.2
+    simHeight: 96, pad: 0.3, splatRadius: 0.4, force: 3500, curl: 10, refraction: 0.3,
+    velocityFade: 2.5, pressure: 0.8, iterations: 20, idle: 2.2
   };
 
   var hero = document.querySelector('.page-wrap > .hero') || document.querySelector('.hero');
@@ -36,9 +36,9 @@ import * as THREE from 'three';
       'void main(){vec2 c=vUv-uDt*texture2D(uVelocity,vUv).xy*uTexel;gl_FragColor=vec4(texture2D(uVelocity,c).xy/(1.+uFade*uDt),0.,1.);}',
     curl: 'varying vec2 vUv;varying vec2 vL;varying vec2 vR;varying vec2 vT;varying vec2 vB;uniform sampler2D uVelocity;' +
       'void main(){float L=texture2D(uVelocity,vL).y;float R=texture2D(uVelocity,vR).y;float T=texture2D(uVelocity,vT).x;float B=texture2D(uVelocity,vB).x;gl_FragColor=vec4(.5*(R-L-T+B),0.,0.,1.);}',
-    vort: 'varying vec2 vUv;varying vec2 vL;varying vec2 vR;varying vec2 vT;varying vec2 vB;uniform sampler2D uVelocity;uniform sampler2D uCurl;uniform float uDt;' +
+    vort: 'varying vec2 vUv;varying vec2 vL;varying vec2 vR;varying vec2 vT;varying vec2 vB;uniform sampler2D uVelocity;uniform sampler2D uCurl;uniform float uDt;uniform float uCurlAmt;' +
       'void main(){float L=texture2D(uCurl,vL).x;float R=texture2D(uCurl,vR).x;float T=texture2D(uCurl,vT).x;float B=texture2D(uCurl,vB).x;float C=texture2D(uCurl,vUv).x;' +
-      'vec2 f=.5*vec2(abs(T)-abs(B),abs(R)-abs(L));f/=length(f)+.0001;f*=12.*C;f.y*=-1.;vec2 v=texture2D(uVelocity,vUv).xy+f*uDt;gl_FragColor=vec4(clamp(v,-1000.,1000.),0.,1.);}',
+      'vec2 f=.5*vec2(abs(T)-abs(B),abs(R)-abs(L));f/=length(f)+.0001;f*=uCurlAmt*C;f.y*=-1.;vec2 v=texture2D(uVelocity,vUv).xy+f*uDt;gl_FragColor=vec4(clamp(v,-1000.,1000.),0.,1.);}',
     div: 'varying vec2 vUv;varying vec2 vL;varying vec2 vR;varying vec2 vT;varying vec2 vB;uniform sampler2D uVelocity;' +
       'void main(){float L=texture2D(uVelocity,vL).x;float R=texture2D(uVelocity,vR).x;float T=texture2D(uVelocity,vT).y;float B=texture2D(uVelocity,vB).y;vec2 C=texture2D(uVelocity,vUv).xy;' +
       'if(vL.x<0.)L=-C.x;if(vR.x>1.)R=-C.x;if(vT.y>1.)T=-C.y;if(vB.y<0.)B=-C.y;gl_FragColor=vec4(.5*(R-L+T-B),0.,0.,1.);}',
@@ -47,8 +47,8 @@ import * as THREE from 'three';
       'void main(){float L=texture2D(uPressure,vL).x;float R=texture2D(uPressure,vR).x;float T=texture2D(uPressure,vT).x;float B=texture2D(uPressure,vB).x;float d=texture2D(uDivergence,vUv).x;gl_FragColor=vec4((L+R+B+T-d)*.25,0.,0.,1.);}',
     grad: 'varying vec2 vUv;varying vec2 vL;varying vec2 vR;varying vec2 vT;varying vec2 vB;uniform sampler2D uPressure;uniform sampler2D uVelocity;' +
       'void main(){float L=texture2D(uPressure,vL).x;float R=texture2D(uPressure,vR).x;float T=texture2D(uPressure,vT).x;float B=texture2D(uPressure,vB).x;gl_FragColor=vec4(texture2D(uVelocity,vUv).xy-vec2(R-L,T-B),0.,1.);}',
-    show: 'varying vec2 vUv;uniform sampler2D uMask;uniform sampler2D uVelocity;uniform float uAmount;uniform float uAspect;' +
-      'void main(){vec2 v=texture2D(uVelocity,vUv).xy;vec2 uv=vUv-v*uAmount*vec2(1./uAspect,1.);float a=texture2D(uMask,uv).a;gl_FragColor=vec4(vec3(a),a);}'
+    show: 'varying vec2 vUv;uniform sampler2D uMask;uniform sampler2D uVelocity;uniform vec2 uOff;' +
+      'void main(){vec2 v=clamp(texture2D(uVelocity,vUv).xy,-400.,400.);vec2 uv=vUv-v*uOff;float a=texture2D(uMask,uv).a;gl_FragColor=vec4(vec3(a),a);}'
   };
 
   function material(frag, uniforms) {
@@ -120,15 +120,15 @@ import * as THREE from 'three';
         renderer.setClearColor(0x000000, 0);
         scene = new THREE.Scene(); cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
         quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), null); scene.add(quad);
-        mats.splat = material(FRAG.splat, { uTarget: { value: null }, uAspect: { value: 1 }, uColor: { value: new THREE.Vector2() }, uPoint: { value: new THREE.Vector2() }, uRadius: { value: P.radius } });
+        mats.splat = material(FRAG.splat, { uTarget: { value: null }, uAspect: { value: 1 }, uColor: { value: new THREE.Vector2() }, uPoint: { value: new THREE.Vector2() }, uRadius: { value: 0.01 } });
         mats.advect = material(FRAG.advect, { uVelocity: { value: null }, uDt: { value: .016 }, uFade: { value: P.velocityFade } });
         mats.curl = material(FRAG.curl, { uVelocity: { value: null } });
-        mats.vort = material(FRAG.vort, { uVelocity: { value: null }, uCurl: { value: null }, uDt: { value: .016 } });
+        mats.vort = material(FRAG.vort, { uVelocity: { value: null }, uCurl: { value: null }, uDt: { value: .016 }, uCurlAmt: { value: P.curl } });
         mats.div = material(FRAG.div, { uVelocity: { value: null } });
         mats.clear = material(FRAG.clear, { uTexture: { value: null }, uValue: { value: P.pressure } });
         mats.press = material(FRAG.press, { uPressure: { value: null }, uDivergence: { value: null } });
         mats.grad = material(FRAG.grad, { uPressure: { value: null }, uVelocity: { value: null } });
-        mats.show = material(FRAG.show, { uMask: { value: null }, uVelocity: { value: null }, uAmount: { value: P.amount }, uAspect: { value: 1 } });
+        mats.show = material(FRAG.show, { uMask: { value: null }, uVelocity: { value: null }, uOff: { value: new THREE.Vector2() } });
         mats.show.transparent = true; mats.show.blending = THREE.CustomBlending;
         mats.show.blendSrc = THREE.OneFactor; mats.show.blendDst = THREE.OneMinusSrcAlphaFactor; mats.show.blendEquation = THREE.AddEquation;
       }
@@ -137,7 +137,6 @@ import * as THREE from 'three';
       velocity = double(simW, simH); pressure = double(simW, simH); divergence = target(simW, simH); curlRT = target(simW, simH);
       for (var k in mats) if (mats[k].uniforms.uTexel) mats[k].uniforms.uTexel.value.set(1 / simW, 1 / simH);
       mats.splat.uniforms.uAspect.value = box.w / box.h;
-      mats.show.uniforms.uAspect.value = box.w / box.h;
       renderer.setPixelRatio(dpr); renderer.setSize(box.w, box.h, false);
       canvas.style.left = box.x + 'px'; canvas.style.top = box.y + 'px'; canvas.style.width = box.w + 'px'; canvas.style.height = box.h + 'px';
       if (!canvas.parentNode) hero.appendChild(canvas);
@@ -156,13 +155,14 @@ import * as THREE from 'three';
 
   function splat(x, y, dx, dy) {
     var u = mats.splat.uniforms;
-    u.uTarget.value = velocity.read.texture; u.uPoint.value.set(x, y); u.uColor.value.set(dx * P.force, dy * P.force); u.uRadius.value = P.radius;
+    u.uTarget.value = velocity.read.texture; u.uPoint.value.set(x, y); u.uColor.value.set(dx * P.force, dy * P.force);
+    u.uRadius.value = (P.splatRadius / 100) * Math.max(1, innerWidth / innerHeight) * Math.pow(innerHeight / box.h, 2);
     pass(mats.splat, velocity.write); velocity.swap();
   }
 
   function step(dt) {
     mats.curl.uniforms.uVelocity.value = velocity.read.texture; pass(mats.curl, curlRT);
-    mats.vort.uniforms.uVelocity.value = velocity.read.texture; mats.vort.uniforms.uCurl.value = curlRT.texture; mats.vort.uniforms.uDt.value = dt;
+    mats.vort.uniforms.uVelocity.value = velocity.read.texture; mats.vort.uniforms.uCurl.value = curlRT.texture; mats.vort.uniforms.uDt.value = dt; mats.vort.uniforms.uCurlAmt.value = P.curl;
     pass(mats.vort, velocity.write); velocity.swap();
     mats.div.uniforms.uVelocity.value = velocity.read.texture; pass(mats.div, divergence);
     mats.clear.uniforms.uTexture.value = pressure.read.texture; mats.clear.uniforms.uValue.value = P.pressure;
@@ -182,7 +182,7 @@ import * as THREE from 'three';
     if (!active) return;
     var dt = Math.min((now - (lastT || now)) / 1000, 1 / 30) || 1 / 60; lastT = now;
     step(dt);
-    mats.show.uniforms.uMask.value = maskTex; mats.show.uniforms.uVelocity.value = velocity.read.texture; mats.show.uniforms.uAmount.value = P.amount;
+    mats.show.uniforms.uMask.value = maskTex; mats.show.uniforms.uVelocity.value = velocity.read.texture; mats.show.uniforms.uOff.value.set(0.00018 * P.refraction * innerWidth / box.w, 0.00018 * P.refraction * innerHeight / box.h);
     renderer.setClearColor(0x000000, 0);
     renderer.setRenderTarget(null); renderer.clear();
     pass(mats.show, null);
@@ -190,8 +190,14 @@ import * as THREE from 'three';
     rafId = requestAnimationFrame(frame);
   }
 
+  function place() {
+    measure();
+    canvas.style.left = box.x + 'px'; canvas.style.top = box.y + 'px'; canvas.style.width = box.w + 'px'; canvas.style.height = box.h + 'px';
+  }
+
   function activate() {
     if (active) return;
+    place();
     active = true; lastT = 0;
     canvas.style.opacity = 1;
     svgs.forEach(function (s) { s.style.visibility = 'hidden'; });
@@ -219,7 +225,7 @@ import * as THREE from 'three';
     if (!active) activate();
     idleAt = now + P.idle * 1000;
     if (last) {
-      var dx = (e.clientX - last.x) / box.h, dy = -(e.clientY - last.y) / box.h;
+      var dx = (e.clientX - last.x) / innerHeight, dy = -(e.clientY - last.y) / innerHeight;
       if (dx || dy) splat((e.clientX - box.left) / box.w, 1 - (e.clientY - box.top) / box.h, dx, dy);
     }
     last = { x: e.clientX, y: e.clientY };
@@ -235,8 +241,9 @@ import * as THREE from 'three';
 
   var tries = 0;
   (function wait() {
-    var g = window.gsap, settled = !D.classList.contains('osply-boot') && g && svgs.every(function (s) { return g.getProperty(s, 'yPercent') === 0 && g.getProperty(s, 'rotationX') === 0; });
+    var g = window.gsap, mt = hero.querySelector('.main-top');
+    var settled = !D.classList.contains('osply-boot') && g && mt && Math.abs(g.getProperty(mt, 'y')) < 0.5 && svgs.every(function (s) { return g.getProperty(s, 'yPercent') === 0 && g.getProperty(s, 'rotationX') === 0; });
     if (settled) { setTimeout(build, 600); return; }
-    if (tries++ < 150) setTimeout(wait, 100);
+    if (tries++ < 300) setTimeout(wait, 100);
   })();
 })();
