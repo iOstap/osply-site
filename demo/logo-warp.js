@@ -9,13 +9,14 @@ import * as THREE from 'three';
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   var P = window.logoWarp = {
-    simHeight: 96, pad: 0.3, splatRadius: 0.4, force: 12600, curl: 3, refraction: 0.3, window: 0.2,
+    simHeight: 96, pad: 0.3, splatRadius: 1, force: 12600, curl: 3, refraction: 0.3, window: 0.3,
     velocityFade: 9, pressure: 0.8, iterations: 20, idle: 1.2
   };
 
   var hero = document.querySelector('.page-wrap > .hero') || document.querySelector('.hero');
   var title = hero && hero.querySelector('.hero-title');
   var svgs = title ? [].slice.call(title.querySelectorAll('.hero-letter .title-letter')) : [];
+  var navW = hero && hero.querySelector('.nav-w');
   if (!hero || !title || !svgs.length) return;
 
   var canvas = document.createElement('canvas');
@@ -48,7 +49,7 @@ import * as THREE from 'three';
     grad: 'varying vec2 vUv;varying vec2 vL;varying vec2 vR;varying vec2 vT;varying vec2 vB;uniform sampler2D uPressure;uniform sampler2D uVelocity;' +
       'void main(){float L=texture2D(uPressure,vL).x;float R=texture2D(uPressure,vR).x;float T=texture2D(uPressure,vT).x;float B=texture2D(uPressure,vB).x;gl_FragColor=vec4(texture2D(uVelocity,vUv).xy-vec2(R-L,T-B),0.,1.);}',
     show: 'varying vec2 vUv;uniform sampler2D uMask;uniform sampler2D uVelocity;uniform vec2 uOff;uniform vec2 uTexel;uniform vec2 uMouse;uniform vec2 uSize;uniform float uWin;' +
-      'void main(){vec2 o=uTexel*1.5;vec2 v=texture2D(uVelocity,vUv).xy*.4+(texture2D(uVelocity,vUv+vec2(o.x,0.)).xy+texture2D(uVelocity,vUv-vec2(o.x,0.)).xy+texture2D(uVelocity,vUv+vec2(0.,o.y)).xy+texture2D(uVelocity,vUv-vec2(0.,o.y)).xy)*.15;v=clamp(v,-400.,400.);v*=1.-smoothstep(uWin*.3,uWin,length((vUv-uMouse)*uSize));vec2 uv=vUv-v*uOff;float a=texture2D(uMask,uv).a;gl_FragColor=vec4(vec3(a),a);}'
+      'void main(){vec2 o=uTexel*1.5;vec2 v=texture2D(uVelocity,vUv).xy*.4+(texture2D(uVelocity,vUv+vec2(o.x,0.)).xy+texture2D(uVelocity,vUv-vec2(o.x,0.)).xy+texture2D(uVelocity,vUv+vec2(0.,o.y)).xy+texture2D(uVelocity,vUv-vec2(0.,o.y)).xy)*.15;v=clamp(v,-400.,400.);v*=1.-smoothstep(uWin*.3,uWin,length((vUv-uMouse)*uSize));vec2 uv=vUv-v*uOff;gl_FragColor=texture2D(uMask,uv);}'
   };
 
   function material(frag, uniforms) {
@@ -72,11 +73,12 @@ import * as THREE from 'three';
   }
 
   function measure() {
-    var hr = hero.getBoundingClientRect(), tr = title.getBoundingClientRect();
-    var padY = tr.height * P.pad, padX = tr.height * P.pad;
-    box.x = tr.left - hr.left - padX; box.y = tr.top - hr.top - padY;
-    box.w = tr.width + padX * 2; box.h = tr.height + padY * 2;
-    box.left = tr.left - padX; box.top = tr.top - padY;
+    var hr = hero.getBoundingClientRect(), tr = title.getBoundingClientRect(), nr = navW ? navW.getBoundingClientRect() : tr;
+    var pad = tr.height * P.pad;
+    var l = Math.min(tr.left, nr.left), r = Math.max(tr.right, nr.right), b = Math.max(tr.bottom, nr.bottom);
+    box.x = l - hr.left - pad; box.y = tr.top - hr.top - pad;
+    box.w = r - l + pad * 2; box.h = b - tr.top + pad * 2;
+    box.left = l - pad; box.top = tr.top - pad;
   }
 
   function drawMask() {
@@ -84,6 +86,7 @@ import * as THREE from 'three';
     var c = document.createElement('canvas');
     c.width = Math.round(box.w * dpr); c.height = Math.round(box.h * dpr);
     var ctx = c.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     var jobs = svgs.map(function (s) {
       var r = s.getBoundingClientRect();
       var clone = s.cloneNode(true);
@@ -93,16 +96,38 @@ import * as THREE from 'three';
       var url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml' }));
       return new Promise(function (res) {
         var im = new Image();
-        im.onload = function () { ctx.drawImage(im, (r.left - box.left) * dpr, (r.top - box.top) * dpr, r.width * dpr, r.height * dpr); URL.revokeObjectURL(url); res(); };
+        im.onload = function () { ctx.drawImage(im, r.left - box.left, r.top - box.top, r.width, r.height); URL.revokeObjectURL(url); res(); };
         im.onerror = function () { URL.revokeObjectURL(url); res(); };
         im.src = url;
       });
     });
-    return Promise.all(jobs).then(function () {
+    return Promise.all(jobs).then(function () { return document.fonts ? document.fonts.ready : null; }).then(function () {
+      if (navW) drawNav(ctx);
       if (maskTex) maskTex.dispose();
       maskTex = new THREE.CanvasTexture(c);
-      maskTex.colorSpace = THREE.NoColorSpace; maskTex.minFilter = THREE.LinearFilter; maskTex.generateMipmaps = false; maskTex.needsUpdate = true;
+      maskTex.colorSpace = THREE.NoColorSpace; maskTex.premultiplyAlpha = true; maskTex.minFilter = THREE.LinearFilter; maskTex.generateMipmaps = false; maskTex.needsUpdate = true;
     });
+  }
+
+  function drawNav(ctx) {
+    var nr = navW.getBoundingClientRect();
+    ctx.fillStyle = getComputedStyle(navW).backgroundColor;
+    ctx.fillRect(nr.left - box.left, nr.top - box.top, nr.width, nr.height);
+    var tw = document.createTreeWalker(navW, NodeFilter.SHOW_TEXT), node;
+    while ((node = tw.nextNode())) {
+      var txt = node.textContent.trim();
+      if (!txt) continue;
+      var cs = getComputedStyle(node.parentElement), rg = document.createRange();
+      rg.selectNodeContents(node);
+      var rc = rg.getClientRects()[0];
+      if (!rc) continue;
+      if (cs.textTransform === 'uppercase') txt = txt.toUpperCase();
+      ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = cs.letterSpacing === 'normal' ? '0px' : cs.letterSpacing;
+      ctx.fillStyle = cs.color; ctx.textBaseline = 'alphabetic';
+      var m = ctx.measureText(txt);
+      ctx.fillText(txt, rc.left - box.left, rc.top - box.top + (m.fontBoundingBoxAscent || parseFloat(cs.fontSize) * 0.8));
+    }
   }
 
   function build() {
@@ -203,6 +228,7 @@ import * as THREE from 'three';
     active = true; lastT = 0;
     canvas.style.opacity = 1;
     svgs.forEach(function (s) { s.style.visibility = 'hidden'; });
+    if (navW) navW.style.opacity = 0;
     rafId = requestAnimationFrame(frame);
   }
 
@@ -211,6 +237,7 @@ import * as THREE from 'three';
     if (rafId) cancelAnimationFrame(rafId); rafId = 0;
     canvas.style.opacity = 0;
     svgs.forEach(function (s) { s.style.visibility = ''; });
+    if (navW) navW.style.opacity = '';
     clearSim();
     last = null;
   }
