@@ -9,8 +9,8 @@ import * as THREE from 'three';
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   var P = window.logoWarp = {
-    simHeight: 96, pad: 0.3, splatRadius: 1, force: 12600, curl: 3, refraction: 0.18, window: 0.3,
-    velocityFade: 9, pressure: 0.8, iterations: 20, idle: 1.2
+    simHeight: 96, pad: 0.3, splatRadius: 1, force: 12600, curl: 3, refraction: 0.11, window: 0.3,
+    velocityFade: 4, pressure: 0.8, iterations: 20, idle: 1.2
   };
 
   var hero = document.querySelector('.page-wrap > .hero') || document.querySelector('.hero');
