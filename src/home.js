@@ -894,7 +894,7 @@ import * as THREE from 'three';
     var r = hero.getBoundingClientRect();
     mouse.tx = (e.clientX - r.left) / W; mouse.ty = 1 - (e.clientY - r.top) / H;
     mouse.in = e.pointerType === 'mouse' && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-    if (mode !== 'intro') hero.classList.toggle('is-hover-card', mouse.in && hit(e.clientX - r.left, e.clientY - r.top) != null && !(e.target.closest && e.target.closest('a, button')));
+    if (mode !== 'intro') hero.classList.toggle('is-hover-card', mouse.in && hit(e.clientX - r.left, e.clientY - r.top) === Math.round(target) && !(e.target.closest && e.target.closest('a, button')));
     if (!drag || e.pointerId !== drag.id) return;
     var dy = e.clientY - drag.y;
     if (Math.abs(dy) > 6) drag.moved = true;
@@ -915,12 +915,10 @@ import * as THREE from 'three';
   hero.addEventListener('click', function (e) {
     if (mode === 'intro' || e.target.closest('a, button, .wi-names, [data-work-list]')) return;
     var r = hero.getBoundingClientRect(), v = hit(e.clientX - r.left, e.clientY - r.top);
-    if (v == null) return;
-    if (v === Math.round(target) && Math.abs(pos - v) < .05) {
-      var it = items[wrap(v)];
-      document.dispatchEvent(new CustomEvent('osply:work-open', { detail: { index: wrap(v), item: it.root, link: it.el } }));
-      if (it.el && it.el.click) it.el.click();
-    } else goTo(v);
+    if (v == null || v !== Math.round(target) || Math.abs(pos - v) >= .05) return;
+    var it = items[wrap(v)];
+    document.dispatchEvent(new CustomEvent('osply:work-open', { detail: { index: wrap(v), item: it.root, link: it.el } }));
+    if (it.el && it.el.click) it.el.click();
   });
 
   var lenisOn = typeof lenis !== 'undefined' && lenis;
