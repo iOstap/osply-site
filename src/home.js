@@ -595,7 +595,7 @@ import * as THREE from 'three';
   }).filter(function (it) { return it.src; });
   var N = items.length;
 
-  var letters = [].slice.call(hero.querySelectorAll('.hero-title .hero-letter img'));
+  var letters = [].slice.call(hero.querySelectorAll('.hero-title .hero-letter .title-letter'));
   var navW = hero.querySelector('.nav-w');
   var navTexts = navW ? [].slice.call(navW.querySelectorAll('.text-xs, .nav-link')).filter(function (n) { return !n.querySelector('.text-xs, .nav-link'); }) : [];
   var bottom = hero.querySelector('.main-bottom');
