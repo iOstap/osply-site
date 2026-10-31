@@ -935,10 +935,14 @@ import * as THREE from 'three';
     catch (e) { return [el]; }
   }
 
+  var topLive = true;
+  function pinTop() { if (topLive) gsap.set(top, { y: hero.clientHeight - 2 * REM - top.offsetHeight }); }
+
   function start() {
     layout(); buildRows();
     if (N) shown = 0;
-    gsap.set(top, { y: H - 2 * REM - top.offsetHeight });
+    pinTop();
+    if (window.ResizeObserver) { var ro = new ResizeObserver(pinTop); ro.observe(top); ro.observe(hero); }
     gsap.set(letters, { y: 0, yPercent: 100, rotationX: 60 });
     if (navW) gsap.set(navW, { clipPath: 'inset(0% 100% 0% 0%)' });
     var navLines = [];
@@ -958,14 +962,14 @@ import * as THREE from 'three';
     gsap.ticker.add(frame);
 
     if (reduce || !N) {
-      gsap.set(top, { y: 0 }); gsap.set(letters, { yPercent: 0, rotationX: 0 }); if (navW) gsap.set(navW, { clipPath: 'inset(0% 0% 0% 0%)' });
+      topLive = false; gsap.set(top, { y: 0 }); gsap.set(letters, { yPercent: 0, rotationX: 0 }); if (navW) gsap.set(navW, { clipPath: 'inset(0% 0% 0% 0%)' });
       gsap.set(navLines.concat(fields, rowSpans), { yPercent: 0, opacity: 1 });
       gsap.set(line, { scaleX: 1 }); if (bottom) gsap.to(bottom, { opacity: 1, duration: .6 });
       enterY = 0; pos = 0; if (pct) pct.remove(); finish(); return;
     }
 
     if (SOFT) {
-      gsap.set(top, { y: 0 });
+      topLive = false; gsap.set(top, { y: 0 });
       gsap.set(fields.concat(rowSpans), { yPercent: 0 });
       gsap.set(line, { scaleX: 1 }); if (bottom) gsap.set(bottom, { opacity: 1 });
       enterY = 0; pos = 0; lastPos = 0; if (pct) pct.remove(); finish();
@@ -1011,6 +1015,7 @@ import * as THREE from 'three';
     tl.to({ y: ENTER }, { y: 0, duration: 1.4, ease: 'power3.out', onUpdate: function () { enterY = this.targets()[0].y; } }, B);
     var sp = { t: 0 };
     tl.to(sp, { t: S, duration: S, ease: 'none', onUpdate: function () { pos = -LOOPS * (1 - spinEase(Math.min(1, spinClock(sp.t) / S0))); } }, B);
+    tl.add(function () { topLive = false; }, B + CFG.topAt);
     tl.to(top, { y: 0, duration: CFG.topDur, ease: 'power3.inOut' }, B + CFG.topAt);
     var L = A + S - CFG.infoEarly + CFG.infoDelay;
     tl.to(line, { scaleX: 1, duration: 1.2, ease: 'expo.inOut' }, L);
