@@ -9,7 +9,7 @@ import * as THREE from 'three';
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   var P = window.logoWarp = {
-    simHeight: 96, pad: 0.3, splatRadius: 0.4, force: 3500, curl: 10, refraction: 0.3,
+    simHeight: 96, pad: 0.3, splatRadius: 0.4, force: 3500, curl: 3, refraction: 0.3,
     velocityFade: 2.5, pressure: 0.8, iterations: 20, idle: 2.2
   };
 
@@ -47,8 +47,8 @@ import * as THREE from 'three';
       'void main(){float L=texture2D(uPressure,vL).x;float R=texture2D(uPressure,vR).x;float T=texture2D(uPressure,vT).x;float B=texture2D(uPressure,vB).x;float d=texture2D(uDivergence,vUv).x;gl_FragColor=vec4((L+R+B+T-d)*.25,0.,0.,1.);}',
     grad: 'varying vec2 vUv;varying vec2 vL;varying vec2 vR;varying vec2 vT;varying vec2 vB;uniform sampler2D uPressure;uniform sampler2D uVelocity;' +
       'void main(){float L=texture2D(uPressure,vL).x;float R=texture2D(uPressure,vR).x;float T=texture2D(uPressure,vT).x;float B=texture2D(uPressure,vB).x;gl_FragColor=vec4(texture2D(uVelocity,vUv).xy-vec2(R-L,T-B),0.,1.);}',
-    show: 'varying vec2 vUv;uniform sampler2D uMask;uniform sampler2D uVelocity;uniform vec2 uOff;' +
-      'void main(){vec2 v=clamp(texture2D(uVelocity,vUv).xy,-400.,400.);vec2 uv=vUv-v*uOff;float a=texture2D(uMask,uv).a;gl_FragColor=vec4(vec3(a),a);}'
+    show: 'varying vec2 vUv;uniform sampler2D uMask;uniform sampler2D uVelocity;uniform vec2 uOff;uniform vec2 uTexel;' +
+      'void main(){vec2 o=uTexel*1.5;vec2 v=texture2D(uVelocity,vUv).xy*.4+(texture2D(uVelocity,vUv+vec2(o.x,0.)).xy+texture2D(uVelocity,vUv-vec2(o.x,0.)).xy+texture2D(uVelocity,vUv+vec2(0.,o.y)).xy+texture2D(uVelocity,vUv-vec2(0.,o.y)).xy)*.15;v=clamp(v,-400.,400.);vec2 uv=vUv-v*uOff;float a=texture2D(uMask,uv).a;gl_FragColor=vec4(vec3(a),a);}'
   };
 
   function material(frag, uniforms) {
@@ -226,7 +226,11 @@ import * as THREE from 'three';
     idleAt = now + P.idle * 1000;
     if (last) {
       var dx = (e.clientX - last.x) / innerHeight, dy = -(e.clientY - last.y) / innerHeight;
-      if (dx || dy) splat((e.clientX - box.left) / box.w, 1 - (e.clientY - box.top) / box.h, dx, dy);
+      var dist = Math.hypot(e.clientX - last.x, e.clientY - last.y), n = Math.max(1, Math.min(16, Math.ceil(dist / 10)));
+      if (dx || dy) for (var k = 1; k <= n; k++) {
+        var f = k / n;
+        splat((last.x + (e.clientX - last.x) * f - box.left) / box.w, 1 - (last.y + (e.clientY - last.y) * f - box.top) / box.h, dx / n, dy / n);
+      }
     }
     last = { x: e.clientX, y: e.clientY };
   }, { passive: true });
