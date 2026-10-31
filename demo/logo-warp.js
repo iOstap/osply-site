@@ -9,7 +9,7 @@ import * as THREE from 'three';
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   var P = window.logoWarp = {
-    simHeight: 96, pad: 0.3, splatRadius: 1, force: 12600, curl: 3, refraction: 0.3, window: 0.3,
+    simHeight: 96, pad: 0.3, splatRadius: 1, force: 12600, curl: 3, refraction: 0.18, window: 0.3,
     velocityFade: 9, pressure: 0.8, iterations: 20, idle: 1.2
   };
 
@@ -23,7 +23,7 @@ import * as THREE from 'three';
   canvas.style.cssText = 'position:absolute;pointer-events:none;z-index:3;opacity:0;display:block';
   var renderer, ready = false, building = false, active = false, rafId = 0, idleAt = 0;
   var box = { x: 0, y: 0, w: 0, h: 0 }, simW = 0, simH = 0;
-  var maskTex, velocity, pressure, divergence, curlRT;
+  var maskTex, maskCtx, navSig = '', velocity, pressure, divergence, curlRT;
   var quad, scene, cam, mats = {};
   var last = null, lastT = 0, winT = { x: 0.5, y: 0.5 }, win = { x: 0.5, y: 0.5 };
 
@@ -102,32 +102,69 @@ import * as THREE from 'three';
       });
     });
     return Promise.all(jobs).then(function () { return document.fonts ? document.fonts.ready : null; }).then(function () {
-      if (navW) drawNav(ctx);
-      if (maskTex) maskTex.dispose();
+      if (maskTex) { maskTex.dispose(); maskTex = null; }
+      maskCtx = ctx; navSig = '';
+      syncNav(true);
       maskTex = new THREE.CanvasTexture(c);
       maskTex.colorSpace = THREE.NoColorSpace; maskTex.premultiplyAlpha = true; maskTex.minFilter = THREE.LinearFilter; maskTex.generateMipmaps = false; maskTex.needsUpdate = true;
     });
   }
 
-  function drawNav(ctx) {
-    var nr = navW.getBoundingClientRect();
-    ctx.fillStyle = getComputedStyle(navW).backgroundColor;
-    ctx.fillRect(nr.left - box.left, nr.top - box.top, nr.width, nr.height);
-    var tw = document.createTreeWalker(navW, NodeFilter.SHOW_TEXT), node;
+  function navItems() {
+    var items = [], tw = document.createTreeWalker(navW, NodeFilter.SHOW_TEXT), node;
     while ((node = tw.nextNode())) {
       var txt = node.textContent.trim();
       if (!txt) continue;
-      var cs = getComputedStyle(node.parentElement), rg = document.createRange();
+      var el = node.parentElement, rg = document.createRange();
       rg.selectNodeContents(node);
       var rc = rg.getClientRects()[0];
       if (!rc) continue;
+      var op = 1, clip = null, e = el;
+      while (e && e !== navW) {
+        var cs = getComputedStyle(e);
+        op *= parseFloat(cs.opacity);
+        if (cs.overflow !== 'visible' || cs.overflowX !== 'visible' || cs.overflowY !== 'visible') {
+          var r = e.getBoundingClientRect();
+          if (!clip) clip = { l: r.left, t: r.top, r: r.right, b: r.bottom };
+          else { clip.l = Math.max(clip.l, r.left); clip.t = Math.max(clip.t, r.top); clip.r = Math.min(clip.r, r.right); clip.b = Math.min(clip.b, r.bottom); }
+        }
+        e = e.parentElement;
+      }
+      items.push({ txt: txt, rc: rc, op: op, clip: clip, cs: getComputedStyle(el) });
+    }
+    return items;
+  }
+
+  function syncNav(force) {
+    if (!navW || !maskCtx) return;
+    var items = navItems();
+    var sig = items.map(function (i) {
+      return i.txt + '|' + i.rc.left.toFixed(1) + ',' + i.rc.top.toFixed(1) + '|' + i.op.toFixed(2) + (i.clip ? '|' + [i.clip.l, i.clip.t, i.clip.r, i.clip.b].map(Math.round).join(',') : '');
+    }).join(';');
+    if (!force && sig === navSig) return;
+    navSig = sig;
+    var ctx = maskCtx, nr = navW.getBoundingClientRect();
+    var x = nr.left - box.left, y = nr.top - box.top;
+    ctx.save();
+    ctx.clearRect(x - 1, y - 1, nr.width + 2, nr.height + 2);
+    ctx.fillStyle = getComputedStyle(navW).backgroundColor;
+    ctx.fillRect(x, y, nr.width, nr.height);
+    items.forEach(function (it) {
+      var cs = it.cs, txt = it.txt;
+      if (it.clip && (it.clip.r <= it.clip.l || it.clip.b <= it.clip.t)) return;
+      ctx.save();
+      if (it.clip) { ctx.beginPath(); ctx.rect(it.clip.l - box.left, it.clip.t - box.top, it.clip.r - it.clip.l, it.clip.b - it.clip.t); ctx.clip(); }
+      ctx.globalAlpha = it.op;
       if (cs.textTransform === 'uppercase') txt = txt.toUpperCase();
       ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
       if ('letterSpacing' in ctx) ctx.letterSpacing = cs.letterSpacing === 'normal' ? '0px' : cs.letterSpacing;
       ctx.fillStyle = cs.color; ctx.textBaseline = 'alphabetic';
       var m = ctx.measureText(txt);
-      ctx.fillText(txt, rc.left - box.left, rc.top - box.top + (m.fontBoundingBoxAscent || parseFloat(cs.fontSize) * 0.8));
-    }
+      ctx.fillText(txt, it.rc.left - box.left, it.rc.top - box.top + (m.fontBoundingBoxAscent || parseFloat(cs.fontSize) * 0.8));
+      ctx.restore();
+    });
+    ctx.restore();
+    if (maskTex) maskTex.needsUpdate = true;
   }
 
   function build() {
@@ -207,6 +244,7 @@ import * as THREE from 'three';
     if (!active) return;
     var dt = Math.min((now - (lastT || now)) / 1000, 1 / 30) || 1 / 60; lastT = now;
     var wk = 1 - Math.exp(-18 * dt); win.x += (winT.x - win.x) * wk; win.y += (winT.y - win.y) * wk;
+    syncNav(false);
     step(dt);
     mats.show.uniforms.uMask.value = maskTex; mats.show.uniforms.uVelocity.value = velocity.read.texture; mats.show.uniforms.uMouse.value.set(win.x, win.y); mats.show.uniforms.uSize.value.set(box.w, box.h); mats.show.uniforms.uWin.value = P.window * innerHeight;
     mats.show.uniforms.uOff.value.set(0.00018 * P.refraction * innerWidth / box.w, 0.00018 * P.refraction * innerHeight / box.h);
@@ -228,7 +266,7 @@ import * as THREE from 'three';
     active = true; lastT = 0;
     canvas.style.opacity = 1;
     svgs.forEach(function (s) { s.style.visibility = 'hidden'; });
-    if (navW) navW.style.opacity = 0;
+    if (navW) { syncNav(true); navW.style.opacity = 0; }
     rafId = requestAnimationFrame(frame);
   }
 
