@@ -575,8 +575,8 @@ import * as THREE from 'three';
     bendDesk: .12, bendMob: .14, bendMobEdge: .1,
     lens: .22, lensR: .17,
     fluid: {
-      sim: 112, dye: 320, radius: .8, force: 3000, visc: .32, velFade: 1.1, dyeFade: .8, hold: 4.5,
-      refr: .7, drag: .00016, lineK: 1.7, aberration: .16, lift: .05, rim: .05
+      sim: 96, dye: 256, radius: 1.2, force: 1500, maxStep: .025, visc: .55, viscIter: 4, velFade: 1.6, dyeFade: .9, hold: 4.5,
+      refr: .32, drag: .00006, maxOff: .035, lineK: 1.6, aberration: .1, lift: .045, rim: .04
     },
     volume: .3, sound: true
   };
@@ -690,7 +690,7 @@ import * as THREE from 'three';
       tMap: { value: rt.texture }, tDye: { value: dummy }, tVel: { value: dummy },
       uMouse: { value: new THREE.Vector2(.5, .5) }, uRes: { value: new THREE.Vector2(1, 1) }, uTexel: { value: new THREE.Vector2(.01, .01) },
       uAspect: { value: 1 }, uAmt: { value: 0 }, uRad: { value: CFG.lensR }, uDpr: { value: 1 }, uTime: { value: 0 },
-      uFluid: { value: 0 }, uRefr: { value: FL.refr }, uDrag: { value: FL.drag }, uLineK: { value: FL.lineK }, uAb: { value: FL.aberration }, uLift: { value: FL.lift }, uRim: { value: FL.rim },
+      uFluid: { value: 0 }, uRefr: { value: FL.refr }, uDrag: { value: FL.drag }, uLineK: { value: FL.lineK }, uAb: { value: FL.aberration }, uLift: { value: FL.lift }, uRim: { value: FL.rim }, uMaxOff: { value: FL.maxOff },
       uLineOn: { value: 0 }, uLineY: { value: .5 }, uLineS: { value: 0 }, uPad: { value: 16 }
     },
     vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
@@ -702,14 +702,17 @@ import * as THREE from 'three';
       'uniform float uLineOn;uniform float uLineY;uniform float uLineS;uniform float uPad;',
       'varying vec2 vUv;',
       'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
-      'float hh(vec2 p){return 1.-exp(-texture2D(tDye,p).r*2.2);}',
+      'uniform float uMaxOff;',
+      'float hh(vec2 p){vec2 t=uTexel*1.5;float s=texture2D(tDye,p).r*.4;s+=(texture2D(tDye,p+vec2(t.x,0.)).r+texture2D(tDye,p-vec2(t.x,0.)).r+texture2D(tDye,p+vec2(0.,t.y)).r+texture2D(tDye,p-vec2(0.,t.y)).r)*.15;return 1.-exp(-s*1.8);}',
       'void main(){',
       ' float h=0.;vec2 g=vec2(0.);vec2 off=vec2(0.);',
       ' if(uFluid>.5){',
       '  h=hh(vUv);',
-      '  g=vec2(hh(vUv+vec2(uTexel.x,0.))-hh(vUv-vec2(uTexel.x,0.)),hh(vUv+vec2(0.,uTexel.y))-hh(vUv-vec2(0.,uTexel.y)))*.5;',
-      '  vec2 v=clamp(texture2D(tVel,vUv).xy,-300.,300.);',
+      '  vec2 e=uTexel*2.5;',
+      '  g=vec2(hh(vUv+vec2(e.x,0.))-hh(vUv-vec2(e.x,0.)),hh(vUv+vec2(0.,e.y))-hh(vUv-vec2(0.,e.y)))*.5;',
+      '  vec2 v=clamp(texture2D(tVel,vUv).xy,-200.,200.);',
       '  off=-g*uRefr-v*uDrag*h;',
+      '  float ol=length(off);if(ol>uMaxOff)off*=uMaxOff/ol;',
       '  off.x/=uAspect;',
       ' }',
       ' vec2 d=vUv-uMouse;d.x*=uAspect;',
@@ -796,7 +799,7 @@ import * as THREE from 'three';
   function fstep(dt) {
     var f = fluid, k;
     for (k in fm) fm[k].uniforms.texelSize.value.copy(f.st);
-    for (var i = 0; i < 2; i++) { fm.visc.uniforms.uV.value = f.vel.read.texture; fpass(fm.visc, f.vel.write); f.vel.swap(); }
+    for (var i = 0; i < FL.viscIter; i++) { fm.visc.uniforms.uV.value = f.vel.read.texture; fpass(fm.visc, f.vel.write); f.vel.swap(); }
     fm.div.uniforms.uVelocity.value = f.vel.read.texture; fpass(fm.div, f.div);
     fm.clear.uniforms.uTexture.value = f.pr.read.texture; fpass(fm.clear, f.pr.write); f.pr.swap();
     fm.pressure.uniforms.uDivergence.value = f.div.texture;
@@ -968,6 +971,7 @@ import * as THREE from 'three';
       if (mouse.in && mode === 'free') {
         if (fp.sx === null) { fp.sx = mouse.tx; fp.sy = mouse.ty; }
         var fdx = mouse.tx - fp.sx, fdy = mouse.ty - fp.sy, fdist = Math.hypot(fdx, fdy), asp = W / H;
+        if (fdist > FL.maxStep) { fdx *= FL.maxStep / fdist; fdy *= FL.maxStep / fdist; fdist = FL.maxStep; }
         if (fdist > 1e-5) {
           fsplat(mouse.tx, mouse.ty, fdx * FL.force * (asp > 1 ? asp : 1), fdy * FL.force, Math.min(fdist * 25, .8) + .08);
           fp.sx = mouse.tx; fp.sy = mouse.ty; fUntil = now + FL.hold * 1000;
