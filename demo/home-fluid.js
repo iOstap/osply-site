@@ -575,8 +575,8 @@ import * as THREE from 'three';
     bendDesk: .12, bendMob: .14, bendMobEdge: .1,
     lens: .22, lensR: .17,
     fluid: {
-      sim: 96, dye: 256, radius: 1.2, force: 1500, maxStep: .025, visc: .55, viscIter: 4, velFade: 1.6, dyeFade: .9, hold: 4.5,
-      refr: .32, drag: .00006, maxOff: .035, lineK: 1.6, aberration: .1, lift: .045, rim: .04
+      sim: 128, dye: 384, size: 44, force: 1200, maxStep: .02, visc: .5, viscIter: 3, velFade: 2.4, dyeFade: 2.4, hold: 1.6,
+      refr: .3, drag: .00005, maxOff: .02, lineK: 1.6, aberration: .1, lift: .05, rim: .045
     },
     volume: .3, sound: true
   };
@@ -708,7 +708,7 @@ import * as THREE from 'three';
       ' float h=0.;vec2 g=vec2(0.);vec2 off=vec2(0.);',
       ' if(uFluid>.5){',
       '  h=hh(vUv);',
-      '  vec2 e=uTexel*2.5;',
+      '  vec2 e=uTexel*2.;',
       '  g=vec2(hh(vUv+vec2(e.x,0.))-hh(vUv-vec2(e.x,0.)),hh(vUv+vec2(0.,e.y))-hh(vUv-vec2(0.,e.y)))*.5;',
       '  vec2 v=clamp(texture2D(tVel,vUv).xy,-200.,200.);',
       '  off=-g*uRefr-v*uDrag*h;',
@@ -790,7 +790,7 @@ import * as THREE from 'three';
   }
   function fsplat(x, y, dx, dy, amt) {
     var u = fm.splat.uniforms, asp = W / H;
-    u.aspect.value = asp; u.point.value.set(x, y); u.radius.value = (FL.radius / 100) * (asp > 1 ? asp : 1);
+    u.aspect.value = asp; u.point.value.set(x, y); u.radius.value = Math.pow(FL.size / H, 2) / 2.3;
     u.uTarget.value = fluid.vel.read.texture; u.color.value.set(dx, dy, 0); u.texelSize.value.copy(fluid.st);
     fpass(fm.splat, fluid.vel.write); fluid.vel.swap();
     u.uTarget.value = fluid.dye.read.texture; u.color.value.set(amt, 0, 0); u.texelSize.value.copy(fluid.dt);
