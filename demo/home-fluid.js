@@ -575,8 +575,8 @@ import * as THREE from 'three';
     bendDesk: .12, bendMob: .14, bendMobEdge: .1,
     lens: .22, lensR: .17,
     fluid: {
-      sim: 128, dye: 384, size: 62, force: 1350, maxStep: .02, visc: .5, viscIter: 3, velFade: 2, dyeFade: 1.8, spread: .4, spreadIter: 1, hold: 2.2,
-      refr: .3, drag: .00005, maxOff: .02, lineK: 0, aberration: .1, lift: .027, rim: .025
+      res: 320, size: 62, amt: .6, fade: 2.2, spread: .35, spreadIter: 1, hold: 2.2,
+      refr: .5, maxOff: .03, lineK: 0, aberration: .1, lift: .027, rim: .025
     },
     volume: .3, sound: true
   };
@@ -687,31 +687,30 @@ import * as THREE from 'three';
   var dummy = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1); dummy.needsUpdate = true;
   var post = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
     uniforms: {
-      tMap: { value: rt.texture }, tDye: { value: dummy }, tVel: { value: dummy },
+      tMap: { value: rt.texture }, tDye: { value: dummy },
       uMouse: { value: new THREE.Vector2(.5, .5) }, uRes: { value: new THREE.Vector2(1, 1) }, uTexel: { value: new THREE.Vector2(.01, .01) },
       uAspect: { value: 1 }, uAmt: { value: 0 }, uRad: { value: CFG.lensR }, uDpr: { value: 1 }, uTime: { value: 0 },
-      uFluid: { value: 0 }, uRefr: { value: FL.refr }, uDrag: { value: FL.drag }, uLineK: { value: FL.lineK }, uAb: { value: FL.aberration }, uLift: { value: FL.lift }, uRim: { value: FL.rim }, uMaxOff: { value: FL.maxOff },
+      uFluid: { value: 0 }, uRefr: { value: FL.refr }, uLineK: { value: FL.lineK }, uAb: { value: FL.aberration }, uLift: { value: FL.lift }, uRim: { value: FL.rim }, uMaxOff: { value: FL.maxOff },
       uLineOn: { value: 0 }, uLineY: { value: .5 }, uLineS: { value: 0 }, uPad: { value: 16 }
     },
     vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader: [
-      'uniform sampler2D tMap;uniform sampler2D tDye;uniform sampler2D tVel;',
+      'uniform sampler2D tMap;uniform sampler2D tDye;',
       'uniform vec2 uMouse;uniform vec2 uRes;uniform vec2 uTexel;',
       'uniform float uAspect;uniform float uAmt;uniform float uRad;uniform float uDpr;uniform float uTime;',
-      'uniform float uFluid;uniform float uRefr;uniform float uDrag;uniform float uLineK;uniform float uAb;uniform float uLift;uniform float uRim;',
+      'uniform float uFluid;uniform float uRefr;uniform float uLineK;uniform float uAb;uniform float uLift;uniform float uRim;',
       'uniform float uLineOn;uniform float uLineY;uniform float uLineS;uniform float uPad;',
       'varying vec2 vUv;',
       'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
       'uniform float uMaxOff;',
-      'float hh(vec2 p){vec2 t=uTexel*1.5;float s=texture2D(tDye,p).r*.4;s+=(texture2D(tDye,p+vec2(t.x,0.)).r+texture2D(tDye,p-vec2(t.x,0.)).r+texture2D(tDye,p+vec2(0.,t.y)).r+texture2D(tDye,p-vec2(0.,t.y)).r)*.15;return 1.-exp(-s*1.8);}',
+      'float hh(vec2 p){vec2 t=uTexel*1.5;float s=texture2D(tDye,p).r*.4;s+=(texture2D(tDye,p+vec2(t.x,0.)).r+texture2D(tDye,p-vec2(t.x,0.)).r+texture2D(tDye,p+vec2(0.,t.y)).r+texture2D(tDye,p-vec2(0.,t.y)).r)*.15;return s;}',
       'void main(){',
       ' float h=0.;vec2 g=vec2(0.);vec2 off=vec2(0.);',
       ' if(uFluid>.5){',
       '  h=hh(vUv);',
       '  vec2 e=uTexel*2.;',
       '  g=vec2(hh(vUv+vec2(e.x,0.))-hh(vUv-vec2(e.x,0.)),hh(vUv+vec2(0.,e.y))-hh(vUv-vec2(0.,e.y)))*.5;',
-      '  vec2 v=clamp(texture2D(tVel,vUv).xy,-200.,200.);',
-      '  off=-g*uRefr-v*uDrag*h;',
+      '  off=-g*uRefr;',
       '  float ol=length(off);if(ol>uMaxOff)off*=uMaxOff/ol;',
       '  off.x/=uAspect;',
       ' }',
@@ -763,57 +762,29 @@ import * as THREE from 'three';
   var fm = null;
   function fluidInit() {
     fm = {
-      splat: fmat('uniform sampler2D uTarget;uniform float aspect;uniform vec3 color;uniform vec2 point;uniform float radius;void main(){vec2 p=vUv-point;p.x*=aspect;vec3 s=exp(-dot(p,p)/radius)*color;gl_FragColor=vec4(texture2D(uTarget,vUv).xyz+s,1.);}',
-        { uTarget: { value: null }, aspect: { value: 1 }, color: { value: new THREE.Vector3() }, point: { value: new THREE.Vector2() }, radius: { value: .001 } }),
-      advect: fmat('uniform sampler2D uVelocity;uniform sampler2D uSource;uniform vec2 velTexel;uniform float dt;uniform float dissipation;void main(){vec2 c=vUv-dt*texture2D(uVelocity,vUv).xy*velTexel;gl_FragColor=texture2D(uSource,c)/(1.+dissipation*dt);}',
-        { uVelocity: { value: null }, uSource: { value: null }, velTexel: { value: new THREE.Vector2() }, dt: { value: .016 }, dissipation: { value: 1 } }),
-      visc: fmat('uniform sampler2D uV;uniform float k;void main(){vec2 c=texture2D(uV,vUv).xy;vec2 a=(texture2D(uV,vL).xy+texture2D(uV,vR).xy+texture2D(uV,vT).xy+texture2D(uV,vB).xy)*.25;gl_FragColor=vec4(mix(c,a,k),0.,1.);}',
-        { uV: { value: null }, k: { value: FL.visc } }),
-      div: fmat('uniform sampler2D uVelocity;void main(){float L=texture2D(uVelocity,vL).x;float R=texture2D(uVelocity,vR).x;float T=texture2D(uVelocity,vT).y;float B=texture2D(uVelocity,vB).y;vec2 C=texture2D(uVelocity,vUv).xy;if(vL.x<0.)L=-C.x;if(vR.x>1.)R=-C.x;if(vT.y>1.)T=-C.y;if(vB.y<0.)B=-C.y;gl_FragColor=vec4(.5*(R-L+T-B),0.,0.,1.);}',
-        { uVelocity: { value: null } }),
-      clear: fmat('uniform sampler2D uTexture;uniform float value;void main(){gl_FragColor=value*texture2D(uTexture,vUv);}',
-        { uTexture: { value: null }, value: { value: .8 } }),
-      pressure: fmat('uniform sampler2D uPressure;uniform sampler2D uDivergence;void main(){float L=texture2D(uPressure,vL).x;float R=texture2D(uPressure,vR).x;float T=texture2D(uPressure,vT).x;float B=texture2D(uPressure,vB).x;float d=texture2D(uDivergence,vUv).x;gl_FragColor=vec4((L+R+B+T-d)*.25,0.,0.,1.);}',
-        { uPressure: { value: null }, uDivergence: { value: null } }),
-      grad: fmat('uniform sampler2D uPressure;uniform sampler2D uVelocity;void main(){float L=texture2D(uPressure,vL).x;float R=texture2D(uPressure,vR).x;float T=texture2D(uPressure,vT).x;float B=texture2D(uPressure,vB).x;vec2 v=texture2D(uVelocity,vUv).xy-vec2(R-L,T-B);gl_FragColor=vec4(v,0.,1.);}',
-        { uPressure: { value: null }, uVelocity: { value: null } })
+      stamp: fmat('uniform sampler2D uT;uniform vec2 a;uniform vec2 b;uniform float aspect;uniform float rad;uniform float amt;uniform float fade;' +
+        'void main(){float h=texture2D(uT,vUv).r*fade;vec2 p=vUv,A=a,B=b;p.x*=aspect;A.x*=aspect;B.x*=aspect;vec2 pa=p-A,ba=B-A;float t=clamp(dot(pa,ba)/max(dot(ba,ba),1e-8),0.,1.);vec2 q=pa-ba*t;float s=exp(-dot(q,q)/rad)*amt;gl_FragColor=vec4(h+s*(1.-h),0.,0.,1.);}',
+        { uT: { value: null }, a: { value: new THREE.Vector2() }, b: { value: new THREE.Vector2() }, aspect: { value: 1 }, rad: { value: .001 }, amt: { value: 0 }, fade: { value: 1 } }),
+      blur: fmat('uniform sampler2D uV;uniform float k;void main(){float c=texture2D(uV,vUv).r;float a=(texture2D(uV,vL).r+texture2D(uV,vR).r+texture2D(uV,vT).r+texture2D(uV,vB).r)*.25;gl_FragColor=vec4(mix(c,a,k),0.,0.,1.);}',
+        { uV: { value: null }, k: { value: FL.spread } })
     };
   }
   function fres(b) { var asp = W / H, ar = Math.max(asp, 1 / asp), mn = Math.round(b), mx = Math.round(b * ar); return asp > 1 ? [mx, mn] : [mn, mx]; }
   function fluidResize() {
     if (!fm) fluidInit();
-    if (fluid) { [fluid.vel, fluid.dye, fluid.pr].forEach(function (d) { d.read.dispose(); d.write.dispose(); }); fluid.div.dispose(); }
-    var s = fres(FL.sim), d = fres(FL.dye);
-    fluid = { vel: fdouble(s[0], s[1]), pr: fdouble(s[0], s[1]), dye: fdouble(d[0], d[1]), div: frt(s[0], s[1]), st: new THREE.Vector2(1 / s[0], 1 / s[1]), dt: new THREE.Vector2(1 / d[0], 1 / d[1]) };
-    post.material.uniforms.uTexel.value.copy(fluid.dt);
+    if (fluid) { fluid.h.read.dispose(); fluid.h.write.dispose(); }
+    var d = fres(FL.res);
+    fluid = { h: fdouble(d[0], d[1]), t: new THREE.Vector2(1 / d[0], 1 / d[1]) };
+    post.material.uniforms.uTexel.value.copy(fluid.t);
     fUntil = 0; fp.sx = null;
   }
-  function fsplat(x, y, dx, dy, amt) {
-    var u = fm.splat.uniforms, asp = W / H;
-    u.aspect.value = asp; u.point.value.set(x, y); u.radius.value = Math.pow(FL.size / H, 2) / 2.3;
-    u.uTarget.value = fluid.vel.read.texture; u.color.value.set(dx, dy, 0); u.texelSize.value.copy(fluid.st);
-    fpass(fm.splat, fluid.vel.write); fluid.vel.swap();
-    u.uTarget.value = fluid.dye.read.texture; u.color.value.set(amt, 0, 0); u.texelSize.value.copy(fluid.dt);
-    fpass(fm.splat, fluid.dye.write); fluid.dye.swap();
-  }
-  function fstep(dt) {
-    var f = fluid, k;
-    for (k in fm) fm[k].uniforms.texelSize.value.copy(f.st);
-    for (var i = 0; i < FL.viscIter; i++) { fm.visc.uniforms.uV.value = f.vel.read.texture; fpass(fm.visc, f.vel.write); f.vel.swap(); }
-    fm.div.uniforms.uVelocity.value = f.vel.read.texture; fpass(fm.div, f.div);
-    fm.clear.uniforms.uTexture.value = f.pr.read.texture; fpass(fm.clear, f.pr.write); f.pr.swap();
-    fm.pressure.uniforms.uDivergence.value = f.div.texture;
-    for (i = 0; i < 16; i++) { fm.pressure.uniforms.uPressure.value = f.pr.read.texture; fpass(fm.pressure, f.pr.write); f.pr.swap(); }
-    fm.grad.uniforms.uPressure.value = f.pr.read.texture; fm.grad.uniforms.uVelocity.value = f.vel.read.texture;
-    fpass(fm.grad, f.vel.write); f.vel.swap();
-    var a = fm.advect.uniforms; a.dt.value = dt; a.velTexel.value.copy(f.st);
-    a.uVelocity.value = f.vel.read.texture; a.uSource.value = f.vel.read.texture; a.dissipation.value = FL.velFade;
-    fm.advect.uniforms.texelSize.value.copy(f.st); fpass(fm.advect, f.vel.write); f.vel.swap();
-    a.uVelocity.value = f.vel.read.texture; a.uSource.value = f.dye.read.texture; a.dissipation.value = FL.dyeFade;
-    fm.advect.uniforms.texelSize.value.copy(f.dt); fpass(fm.advect, f.dye.write); f.dye.swap();
-    var vu = fm.visc.uniforms; vu.texelSize.value.copy(f.dt).multiplyScalar(2); vu.k.value = FL.spread;
-    for (i = 0; i < FL.spreadIter; i++) { vu.uV.value = f.dye.read.texture; fpass(fm.visc, f.dye.write); f.dye.swap(); }
-    vu.k.value = FL.visc;
+  function fstep(dt, ax, ay, bx, by, amt) {
+    var f = fluid, s = fm.stamp.uniforms, b = fm.blur.uniforms;
+    s.texelSize.value.copy(f.t); s.uT.value = f.h.read.texture; s.a.value.set(ax, ay); s.b.value.set(bx, by);
+    s.aspect.value = W / H; s.rad.value = Math.pow(FL.size / H, 2) / 2.3; s.amt.value = amt; s.fade.value = Math.exp(-FL.fade * dt);
+    fpass(fm.stamp, f.h.write); f.h.swap();
+    b.texelSize.value.copy(f.t).multiplyScalar(2); b.k.value = FL.spread;
+    for (var i = 0; i < FL.spreadIter; i++) { b.uV.value = f.h.read.texture; fpass(fm.blur, f.h.write); f.h.swap(); }
   }
 
   var pool = [];
@@ -971,17 +942,17 @@ import * as THREE from 'three';
     lens += ((on ? CFG.lens : 0) - lens) * .08;
     var velo = Math.min(mouse.speed, .05), pu = post.material.uniforms, now = performance.now(), live = false;
     if (fluid && pu.uFluid.value > .5) {
+      var ax = 0, ay = 0, amt = 0;
       if (mouse.in && mode === 'free') {
         if (fp.sx === null) { fp.sx = mouse.tx; fp.sy = mouse.ty; }
-        var fdx = mouse.tx - fp.sx, fdy = mouse.ty - fp.sy, fdist = Math.hypot(fdx, fdy), asp = W / H;
-        if (fdist > FL.maxStep) { fdx *= FL.maxStep / fdist; fdy *= FL.maxStep / fdist; fdist = FL.maxStep; }
-        if (fdist > 1e-5) {
-          fsplat(mouse.tx, mouse.ty, fdx * FL.force * (asp > 1 ? asp : 1), fdy * FL.force, Math.min(fdist * 25, .8) + .08);
+        var fdist = Math.hypot((mouse.tx - fp.sx) * W / H, mouse.ty - fp.sy);
+        if (fdist > 1e-4) {
+          ax = fp.sx; ay = fp.sy; amt = FL.amt * Math.min(1, fdist / .006);
           fp.sx = mouse.tx; fp.sy = mouse.ty; fUntil = now + FL.hold * 1000;
         }
       } else fp.sx = null;
       live = now < fUntil;
-      if (live) { fstep(dt); pu.tDye.value = fluid.dye.read.texture; pu.tVel.value = fluid.vel.read.texture; }
+      if (live) { fstep(dt, amt ? ax : 0, amt ? ay : 0, amt ? mouse.tx : 0, amt ? mouse.ty : 0, amt); pu.tDye.value = fluid.h.read.texture; }
     }
     pu.uTime.value = now / 1000 % 100;
     pu.uLineS.value = gsap.getProperty(line, 'scaleX');
