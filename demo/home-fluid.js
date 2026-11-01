@@ -573,10 +573,9 @@ import * as THREE from 'three';
     lettersLead: 0, topDur: 1.6, topAt: .7, listDelay: .4, infoEarly: 1.5, infoDelay: .4,
     dim: .7, wheel: 1.6,
     bendDesk: .12, bendMob: .14, bendMobEdge: .1,
-    lens: .22, lensR: .17,
     fluid: {
-      res: 320, size: 62, amt: .6, fade: 2.2, spread: .35, spreadIter: 1, hold: 2.2,
-      refr: .7, maxOff: .04, lineK: 0, aberration: .1, lift: .027, rim: .025
+      res: 320, size: 62, amt: .6, follow: .3, fade: 2.2, spread: .35, spreadIter: 1, hold: 2.2,
+      span: 22, refr: .3, maxOff: .05, lineK: 0, aberration: 0, lift: .027, rim: .025
     },
     volume: .3, sound: true
   };
@@ -688,16 +687,16 @@ import * as THREE from 'three';
   var post = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
     uniforms: {
       tMap: { value: rt.texture }, tDye: { value: dummy },
-      uMouse: { value: new THREE.Vector2(.5, .5) }, uRes: { value: new THREE.Vector2(1, 1) }, uTexel: { value: new THREE.Vector2(.01, .01) },
-      uAspect: { value: 1 }, uAmt: { value: 0 }, uRad: { value: CFG.lensR }, uDpr: { value: 1 }, uTime: { value: 0 },
+      uRes: { value: new THREE.Vector2(1, 1) }, uTexel: { value: new THREE.Vector2(.01, .01) }, uSpan: { value: .02 },
+      uAspect: { value: 1 }, uDpr: { value: 1 }, uTime: { value: 0 },
       uFluid: { value: 0 }, uRefr: { value: FL.refr }, uLineK: { value: FL.lineK }, uAb: { value: FL.aberration }, uLift: { value: FL.lift }, uRim: { value: FL.rim }, uMaxOff: { value: FL.maxOff },
       uLineOn: { value: 0 }, uLineY: { value: .5 }, uLineS: { value: 0 }, uPad: { value: 16 }
     },
     vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader: [
       'uniform sampler2D tMap;uniform sampler2D tDye;',
-      'uniform vec2 uMouse;uniform vec2 uRes;uniform vec2 uTexel;',
-      'uniform float uAspect;uniform float uAmt;uniform float uRad;uniform float uDpr;uniform float uTime;',
+      'uniform vec2 uRes;uniform vec2 uTexel;uniform float uSpan;',
+      'uniform float uAspect;uniform float uDpr;uniform float uTime;',
       'uniform float uFluid;uniform float uRefr;uniform float uLineK;uniform float uAb;uniform float uLift;uniform float uRim;',
       'uniform float uLineOn;uniform float uLineY;uniform float uLineS;uniform float uPad;',
       'varying vec2 vUv;',
@@ -708,23 +707,24 @@ import * as THREE from 'three';
       ' float h=0.;vec2 g=vec2(0.);vec2 off=vec2(0.);',
       ' if(uFluid>.5){',
       '  h=hh(vUv);',
-      '  vec2 e=uTexel*2.;',
-      '  g=vec2(hh(vUv+vec2(e.x,0.))-hh(vUv-vec2(e.x,0.)),hh(vUv+vec2(0.,e.y))-hh(vUv-vec2(0.,e.y)))*.5;',
+      '  vec2 e=vec2(uSpan/uAspect,uSpan);',
+      '  vec2 e2=e*.70710678;',
+      '  float gx=hh(vUv+vec2(e.x,0.))-hh(vUv-vec2(e.x,0.));',
+      '  float gy=hh(vUv+vec2(0.,e.y))-hh(vUv-vec2(0.,e.y));',
+      '  float d1=hh(vUv+e2)-hh(vUv-e2);',
+      '  float d2=hh(vUv+vec2(e2.x,-e2.y))-hh(vUv+vec2(-e2.x,e2.y));',
+      '  g=vec2(gx+(d1+d2)*.70710678,gy+(d1-d2)*.70710678)*.25;',
       '  off=-g*uRefr;',
-      '  float ol=length(off);if(ol>uMaxOff)off*=uMaxOff/ol;',
+      '  float ol=length(off);off*=uMaxOff/(uMaxOff+ol);',
       '  off.x/=uAspect;',
       ' }',
-      ' vec2 d=vUv-uMouse;d.x*=uAspect;',
-      ' float c=smoothstep(uRad,0.,length(d));',
-      ' c=c*c*(3.-2.*c);',
-      ' vec2 uv=mix(vUv,uMouse,c*uAmt)+off;',
+      ' vec2 uv=vUv+off;',
       ' vec2 ab=off*uAb;',
       ' vec4 col=texture2D(tMap,uv);',
-      ' col.r=texture2D(tMap,uv+ab).r;col.b=texture2D(tMap,uv-ab).b;',
-      ' col.rgb+=col.rgb*c*uAmt*.3;',
+      ' if(uAb>0.){col.r=texture2D(tMap,uv+ab).r;col.b=texture2D(tMap,uv-ab).b;}',
       ' vec4 card=vec4(col.rgb*col.a,col.a);',
       ' float bgA=uLift*smoothstep(0.,.65,h);',
-      ' float rim=uRim*clamp(length(g)*16.,0.,1.)*smoothstep(0.,.2,h);',
+      ' float rim=uRim*clamp(length(g)*4.,0.,1.)*smoothstep(0.,.2,h);',
       ' float la=0.;',
       ' if(uLineOn>.5){',
       '  vec2 ul=vUv+off*uLineK;',
@@ -837,7 +837,7 @@ import * as THREE from 'three';
       rt.setSize(Math.round(W * DPR), Math.round(H * DPR));
       cam.left = -W / 2; cam.right = W / 2; cam.top = H / 2; cam.bottom = -H / 2; cam.updateProjectionMatrix();
       var pu0 = post.material.uniforms;
-      pu0.uAspect.value = W / H; pu0.uRes.value.set(W, H); pu0.uDpr.value = DPR; pu0.uPad.value = REM; pu0.uLineY.value = 1 - cy / H;
+      pu0.uAspect.value = W / H; pu0.uRes.value.set(W, H); pu0.uDpr.value = DPR; pu0.uPad.value = REM; pu0.uSpan.value = FL.span / H; pu0.uLineY.value = 1 - cy / H;
       pu0.uLineOn.value = mob ? 0 : 1;
       line.style.opacity = mob ? '' : '0';
       pu0.uFluid.value = !mob && !reduce ? 1 : 0;
@@ -901,7 +901,7 @@ import * as THREE from 'three';
     }
   }
 
-  var mouse = { x: .5, y: .5, tx: .5, ty: .5, px: .5, py: .5, speed: 0, in: false }, lens = 0, meshKey = '', drawnKey = '', drawnTp = null;
+  var mouse = { x: .5, y: .5, tx: .5, ty: .5, in: false }, meshKey = '', drawnKey = '', drawnTp = null;
   function frame() {
     var dt = Math.min(gsap.ticker.deltaRatio(60) / 60, .05);
     if (mode === 'free') pos = smoothDamp(pos, target, dt);
@@ -935,29 +935,25 @@ import * as THREE from 'three';
         rects.push({ v: c.v, x: (W - c.w) / 2, y: sy - c.h / 2, w: c.w, h: c.h });
       });
     }
-    mouse.x += (mouse.tx - mouse.x) * .1; mouse.y += (mouse.ty - mouse.y) * .1;
-    var sp = Math.hypot(mouse.px - mouse.tx, mouse.py - mouse.ty); mouse.px = mouse.tx; mouse.py = mouse.ty;
-    mouse.speed += (sp - mouse.speed) * .1;
-    var on = mouse.in && !mob && mode === 'free' && hit(mouse.tx * W, (1 - mouse.ty) * H) != null;
-    lens += ((on ? CFG.lens : 0) - lens) * .08;
-    var velo = Math.min(mouse.speed, .05), pu = post.material.uniforms, now = performance.now(), live = false;
+    var pu = post.material.uniforms, now = performance.now(), live = false;
     if (fluid && pu.uFluid.value > .5) {
       var ax = 0, ay = 0, amt = 0;
       if (mouse.in && mode === 'free') {
-        if (fp.sx === null) { fp.sx = mouse.tx; fp.sy = mouse.ty; }
-        var fdist = Math.hypot((mouse.tx - fp.sx) * W / H, mouse.ty - fp.sy);
+        if (fp.sx === null) { fp.sx = mouse.x = mouse.tx; fp.sy = mouse.y = mouse.ty; }
+        var fe = 1 - Math.pow(1 - FL.follow, dt * 60);
+        mouse.x += (mouse.tx - mouse.x) * fe; mouse.y += (mouse.ty - mouse.y) * fe;
+        var fdist = Math.hypot((mouse.x - fp.sx) * W / H, mouse.y - fp.sy);
         if (fdist > 1e-4) {
           ax = fp.sx; ay = fp.sy; amt = FL.amt * Math.min(1, fdist / .006);
-          fp.sx = mouse.tx; fp.sy = mouse.ty; fUntil = now + FL.hold * 1000;
+          fp.sx = mouse.x; fp.sy = mouse.y; fUntil = now + FL.hold * 1000;
         }
       } else fp.sx = null;
       live = now < fUntil;
-      if (live) { fstep(dt, amt ? ax : 0, amt ? ay : 0, amt ? mouse.tx : 0, amt ? mouse.ty : 0, amt); pu.tDye.value = fluid.h.read.texture; }
+      if (live) { fstep(dt, ax, ay, amt ? mouse.x : 0, amt ? mouse.y : 0, amt); pu.tDye.value = fluid.h.read.texture; }
     }
     pu.uTime.value = now / 1000 % 100;
     pu.uLineS.value = gsap.getProperty(line, 'scaleX');
-    pu.uMouse.value.set(mouse.x, mouse.y); pu.uAmt.value = Math.min(.6, lens + (on ? velo * 4 : 0)); pu.uRad.value = CFG.lensR + velo * 1.5;
-    var rk = mk + '|' + pu.uMouse.value.x.toFixed(4) + '|' + pu.uMouse.value.y.toFixed(4) + '|' + pu.uAmt.value.toFixed(4) + '|' + pu.uRad.value.toFixed(4) + '|' + pu.uLineS.value.toFixed(3);
+    var rk = mk + '|' + pu.uLineS.value.toFixed(3);
     if (!live && rk === drawnKey) return;
     drawnKey = rk;
     renderer.setRenderTarget(rt); renderer.clear(); renderer.render(scene, cam);
