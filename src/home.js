@@ -574,6 +574,10 @@ import * as THREE from 'three';
     dim: .7, wheel: 1.6,
     bendDesk: .12, bendMob: .14, bendMobEdge: .1,
     lens: .32, lensR: .17,
+    fluid: {
+      res: 320, size: 62, amt: .6, follow: .3, fade: 1.6, spread: .35, spreadIter: 1, hold: 3,
+      span: 22, lift: .036, rim: .03
+    },
     volume: .3, sound: true
   };
   var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -679,24 +683,105 @@ import * as THREE from 'three';
     ' c.rgb=mix(c.rgb,.5+(c.rgb-.5)*.88,uGray);',
     ' gl_FragColor=vec4(c.rgb*uOp,uOp);',
     '}'].join('\n');
+  var FL = CFG.fluid;
+  var dummy = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1); dummy.needsUpdate = true;
   var post = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
-    uniforms: { tMap: { value: rt.texture }, uMouse: { value: new THREE.Vector2(.5, .5) }, uAspect: { value: 1 }, uAmt: { value: 0 }, uRad: { value: CFG.lensR } },
+    uniforms: {
+      tMap: { value: rt.texture }, tDye: { value: dummy },
+      uMouse: { value: new THREE.Vector2(.5, .5) }, uAmt: { value: 0 }, uRad: { value: CFG.lensR },
+      uRes: { value: new THREE.Vector2(1, 1) }, uTexel: { value: new THREE.Vector2(.01, .01) }, uSpan: { value: .02 },
+      uAspect: { value: 1 }, uDpr: { value: 1 }, uTime: { value: 0 },
+      uFluid: { value: 0 }, uLift: { value: FL.lift }, uRim: { value: FL.rim },
+      uLineOn: { value: 0 }, uLineY: { value: .5 }, uLineS: { value: 0 }, uPad: { value: 16 }
+    },
     vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader: [
-      'uniform sampler2D tMap;uniform vec2 uMouse;uniform float uAspect;uniform float uAmt;uniform float uRad;varying vec2 vUv;',
+      'uniform sampler2D tMap;uniform sampler2D tDye;',
+      'uniform vec2 uMouse;uniform float uAmt;uniform float uRad;',
+      'uniform vec2 uRes;uniform vec2 uTexel;uniform float uSpan;',
+      'uniform float uAspect;uniform float uDpr;uniform float uTime;',
+      'uniform float uFluid;uniform float uLift;uniform float uRim;',
+      'uniform float uLineOn;uniform float uLineY;uniform float uLineS;uniform float uPad;',
+      'varying vec2 vUv;',
+      'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
+      'float hh(vec2 p){vec2 t=uTexel*1.5;float s=texture2D(tDye,p).r*.4;s+=(texture2D(tDye,p+vec2(t.x,0.)).r+texture2D(tDye,p-vec2(t.x,0.)).r+texture2D(tDye,p+vec2(0.,t.y)).r+texture2D(tDye,p-vec2(0.,t.y)).r)*.15;return s;}',
       'void main(){',
+      ' float h=0.;vec2 g=vec2(0.);',
+      ' if(uFluid>.5){',
+      '  h=hh(vUv);',
+      '  vec2 e=vec2(uSpan/uAspect,uSpan);',
+      '  g=vec2(hh(vUv+vec2(e.x,0.))-hh(vUv-vec2(e.x,0.)),hh(vUv+vec2(0.,e.y))-hh(vUv-vec2(0.,e.y)))*.5;',
+      ' }',
       ' vec2 d=vUv-uMouse;d.x*=uAspect;',
       ' float c=smoothstep(uRad,0.,length(d));',
       ' c=c*c*(3.-2.*c);',
       ' vec2 uv=mix(vUv,uMouse,c*uAmt);',
       ' vec4 col=texture2D(tMap,uv);',
       ' col.rgb+=col.rgb*c*uAmt*.3;',
-      ' gl_FragColor=col;',
+      ' vec4 card=vec4(col.rgb*col.a,col.a);',
+      ' float bgA=uLift*smoothstep(0.,.65,h);',
+      ' float rim=uRim*clamp(length(g)*4.,0.,1.)*smoothstep(0.,.2,h);',
+      ' float la=0.;',
+      ' if(uLineOn>.5){',
+      '  vec2 ul=vUv;',
+      '  float dy=abs(ul.y-uLineY)*uRes.y;',
+      '  float aa=1./uDpr;',
+      '  float cov=clamp((.25+aa*.5-dy)/aa,0.,1.);',
+      '  float xp=ul.x*uRes.x;',
+      '  float inX=smoothstep(uPad-.5,uPad+.5,xp)*(1.-smoothstep(uPad+(uRes.x-2.*uPad)*uLineS-.5,uPad+(uRes.x-2.*uPad)*uLineS+.5,xp));',
+      '  la=.25*cov*inX;',
+      ' }',
+      ' float ua=1.-(1.-clamp(bgA+rim,0.,1.))*(1.-la);',
+      ' ua+=(hash(gl_FragCoord.xy+fract(uTime)*91.7)-.5)*.006*step(.001,bgA+rim);',
+      ' ua=clamp(ua,0.,1.);',
+      ' vec4 under=vec4(vec3(ua),ua);',
+      ' gl_FragColor=card+under*(1.-card.a);',
       '}'].join('\n'),
-    depthTest: false, depthWrite: false, transparent: true
+    depthTest: false, depthWrite: false, blending: THREE.NoBlending
   }));
   var postScene = new THREE.Scene(); postScene.add(post);
   var postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  var HF = THREE.HalfFloatType, fluid = null, fp = { sx: null, sy: null }, fUntil = 0;
+  var fScene = new THREE.Scene(), fQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
+  fScene.add(fQuad);
+  function frt(w, h) { return new THREE.WebGLRenderTarget(w, h, { type: HF, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false }); }
+  function fdouble(w, h) { return { read: frt(w, h), write: frt(w, h), swap: function () { var t = this.read; this.read = this.write; this.write = t; } }; }
+  var FVERT = [
+    'varying vec2 vUv;varying vec2 vL;varying vec2 vR;varying vec2 vT;varying vec2 vB;uniform vec2 texelSize;',
+    'void main(){vUv=uv;vL=vUv-vec2(texelSize.x,0.);vR=vUv+vec2(texelSize.x,0.);vT=vUv+vec2(0.,texelSize.y);vB=vUv-vec2(0.,texelSize.y);gl_Position=vec4(position.xy,0.,1.);}'].join('\n');
+  function fmat(frag, u) {
+    u.texelSize = { value: new THREE.Vector2() };
+    return new THREE.ShaderMaterial({ vertexShader: FVERT, fragmentShader: 'varying vec2 vUv;varying vec2 vL;varying vec2 vR;varying vec2 vT;varying vec2 vB;\n' + frag, uniforms: u, depthTest: false, depthWrite: false });
+  }
+  function fpass(m, t) { fQuad.material = m; renderer.setRenderTarget(t); renderer.render(fScene, postCam); }
+  var fm = null;
+  function fluidInit() {
+    fm = {
+      stamp: fmat('uniform sampler2D uT;uniform vec2 a;uniform vec2 b;uniform float aspect;uniform float rad;uniform float amt;uniform float fade;' +
+        'void main(){float h=texture2D(uT,vUv).r*fade;vec2 p=vUv,A=a,B=b;p.x*=aspect;A.x*=aspect;B.x*=aspect;vec2 pa=p-A,ba=B-A;float t=clamp(dot(pa,ba)/max(dot(ba,ba),1e-8),0.,1.);vec2 q=pa-ba*t;float s=exp(-dot(q,q)/rad)*amt;gl_FragColor=vec4(h+s*(1.-h),0.,0.,1.);}',
+        { uT: { value: null }, a: { value: new THREE.Vector2() }, b: { value: new THREE.Vector2() }, aspect: { value: 1 }, rad: { value: .001 }, amt: { value: 0 }, fade: { value: 1 } }),
+      blur: fmat('uniform sampler2D uV;uniform float k;void main(){float c=texture2D(uV,vUv).r;float a=(texture2D(uV,vL).r+texture2D(uV,vR).r+texture2D(uV,vT).r+texture2D(uV,vB).r)*.25;gl_FragColor=vec4(mix(c,a,k),0.,0.,1.);}',
+        { uV: { value: null }, k: { value: FL.spread } })
+    };
+  }
+  function fres(b) { var asp = W / H, ar = Math.max(asp, 1 / asp), mn = Math.round(b), mx = Math.round(b * ar); return asp > 1 ? [mx, mn] : [mn, mx]; }
+  function fluidResize() {
+    if (!fm) fluidInit();
+    if (fluid) { fluid.h.read.dispose(); fluid.h.write.dispose(); }
+    var d = fres(FL.res);
+    fluid = { h: fdouble(d[0], d[1]), t: new THREE.Vector2(1 / d[0], 1 / d[1]) };
+    post.material.uniforms.uTexel.value.copy(fluid.t);
+    fUntil = 0; fp.sx = null;
+  }
+  function fstep(dt, ax, ay, bx, by, amt) {
+    var f = fluid, s = fm.stamp.uniforms, b = fm.blur.uniforms;
+    s.texelSize.value.copy(f.t); s.uT.value = f.h.read.texture; s.a.value.set(ax, ay); s.b.value.set(bx, by);
+    s.aspect.value = W / H; s.rad.value = Math.pow(FL.size / H, 2) / 2.3; s.amt.value = amt; s.fade.value = Math.exp(-FL.fade * dt);
+    fpass(fm.stamp, f.h.write); f.h.swap();
+    b.texelSize.value.copy(f.t).multiplyScalar(2); b.k.value = FL.spread;
+    for (var i = 0; i < FL.spreadIter; i++) { b.uV.value = f.h.read.texture; fpass(fm.blur, f.h.write); f.h.swap(); }
+  }
 
   var pool = [];
   function mesh() {
@@ -747,7 +832,12 @@ import * as THREE from 'three';
       renderer.setPixelRatio(DPR); renderer.setSize(W, H, false);
       rt.setSize(Math.round(W * DPR), Math.round(H * DPR));
       cam.left = -W / 2; cam.right = W / 2; cam.top = H / 2; cam.bottom = -H / 2; cam.updateProjectionMatrix();
-      post.material.uniforms.uAspect.value = W / H;
+      var pu0 = post.material.uniforms;
+      pu0.uAspect.value = W / H; pu0.uRes.value.set(W, H); pu0.uDpr.value = DPR; pu0.uPad.value = REM; pu0.uSpan.value = FL.span / H; pu0.uLineY.value = 1 - cy / H;
+      pu0.uLineOn.value = mob ? 0 : 1;
+      line.style.opacity = mob ? '' : '0';
+      pu0.uFluid.value = !mob && !reduce ? 1 : 0;
+      if (!mob && !reduce) fluidResize();
     }
     meshKey = drawnKey = ''; drawnTp = null;
   }
@@ -846,10 +936,27 @@ import * as THREE from 'three';
     mouse.speed += (sp - mouse.speed) * .1;
     var on = mouse.in && !mob && mode === 'free' && hit(mouse.tx * W, (1 - mouse.ty) * H) != null;
     lens += ((on ? CFG.lens : 0) - lens) * .08;
-    var velo = Math.min(mouse.speed, .05), pu = post.material.uniforms;
+    var velo = Math.min(mouse.speed, .05), pu = post.material.uniforms, now = performance.now(), live = false;
+    if (fluid && pu.uFluid.value > .5) {
+      var ax = 0, ay = 0, amt = 0;
+      if (mouse.in && mode === 'free') {
+        if (fp.sx === null) { fp.sx = fp.x = mouse.tx; fp.sy = fp.y = mouse.ty; }
+        var fe = 1 - Math.pow(1 - FL.follow, dt * 60);
+        fp.x += (mouse.tx - fp.x) * fe; fp.y += (mouse.ty - fp.y) * fe;
+        var fdist = Math.hypot((fp.x - fp.sx) * W / H, fp.y - fp.sy);
+        if (fdist > 1e-4) {
+          ax = fp.sx; ay = fp.sy; amt = FL.amt * Math.min(1, fdist / .006);
+          fp.sx = fp.x; fp.sy = fp.y; fUntil = now + FL.hold * 1000;
+        }
+      } else fp.sx = null;
+      live = now < fUntil;
+      if (live) { fstep(dt, ax, ay, amt ? fp.x : 0, amt ? fp.y : 0, amt); pu.tDye.value = fluid.h.read.texture; }
+    }
+    pu.uTime.value = now / 1000 % 100;
+    pu.uLineS.value = gsap.getProperty(line, 'scaleX');
     pu.uMouse.value.set(mouse.x, mouse.y); pu.uAmt.value = Math.min(.6, lens + (on ? velo * 4 : 0)); pu.uRad.value = CFG.lensR + velo * 1.5;
-    var rk = mk + '|' + pu.uMouse.value.x.toFixed(4) + '|' + pu.uMouse.value.y.toFixed(4) + '|' + pu.uAmt.value.toFixed(4) + '|' + pu.uRad.value.toFixed(4);
-    if (rk === drawnKey) return;
+    var rk = mk + '|' + pu.uMouse.value.x.toFixed(4) + '|' + pu.uMouse.value.y.toFixed(4) + '|' + pu.uAmt.value.toFixed(4) + '|' + pu.uRad.value.toFixed(4) + '|' + pu.uLineS.value.toFixed(3);
+    if (!live && rk === drawnKey) return;
     drawnKey = rk;
     renderer.setRenderTarget(rt); renderer.clear(); renderer.render(scene, cam);
     renderer.setRenderTarget(null); renderer.clear(); renderer.render(postScene, postCam);
