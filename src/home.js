@@ -568,7 +568,7 @@ import * as THREE from 'three';
 
   var CFG = {
     gap: .5, small: .64, mobActive: .75,
-    stops: [36, 72], steps: [1.45, 1.45, 1.45], maxLoad: 5,
+    stops: [36, 72], steps: [1, 1, 1], maxLoad: 5,
     spin: 3.6, turn2From: 1, turn2Cut: .8, loops: 2,
     lettersLead: 0, topDur: 1.6, topAt: .7, listDelay: .4, infoEarly: 1.5, infoDelay: .4,
     dim: .7, wheel: 1.6,
