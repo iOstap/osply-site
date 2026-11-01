@@ -575,8 +575,8 @@ import * as THREE from 'three';
     bendDesk: .12, bendMob: .14, bendMobEdge: .1,
     lens: .22, lensR: .17,
     fluid: {
-      sim: 128, dye: 384, size: 54, force: 1200, maxStep: .02, visc: .5, viscIter: 3, velFade: 2.4, dyeFade: 2.4, hold: 1.6,
-      refr: .3, drag: .00005, maxOff: .02, lineK: 0, aberration: .1, lift: .035, rim: .032
+      sim: 128, dye: 384, size: 62, force: 1350, maxStep: .02, visc: .5, viscIter: 3, velFade: 2.2, dyeFade: 2.2, spread: .6, spreadIter: 2, hold: 1.8,
+      refr: .3, drag: .00005, maxOff: .02, lineK: 0, aberration: .1, lift: .027, rim: .025
     },
     volume: .3, sound: true
   };
@@ -811,6 +811,9 @@ import * as THREE from 'three';
     fm.advect.uniforms.texelSize.value.copy(f.st); fpass(fm.advect, f.vel.write); f.vel.swap();
     a.uVelocity.value = f.vel.read.texture; a.uSource.value = f.dye.read.texture; a.dissipation.value = FL.dyeFade;
     fm.advect.uniforms.texelSize.value.copy(f.dt); fpass(fm.advect, f.dye.write); f.dye.swap();
+    var vu = fm.visc.uniforms; vu.texelSize.value.copy(f.dt).multiplyScalar(2); vu.k.value = FL.spread;
+    for (i = 0; i < FL.spreadIter; i++) { vu.uV.value = f.dye.read.texture; fpass(fm.visc, f.dye.write); f.dye.swap(); }
+    vu.k.value = FL.visc;
   }
 
   var pool = [];
