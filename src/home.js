@@ -568,7 +568,7 @@ import * as THREE from 'three';
 
   var CFG = {
     gap: .5, small: .64, mobActive: .75,
-    stops: [50], steps: [1.2, 1.2], maxLoad: 5,
+    stops: [50], steps: [1.2, 1.2], flow: .7, maxLoad: 5,
     spin: 3.6, turn2From: 1, turn2Cut: .8, loops: 2,
     lettersLead: 0, topDur: 1.6, topAt: .7, listDelay: .4, infoEarly: 1.5, infoDelay: .4,
     dim: .7, wheel: 1.6,
@@ -995,12 +995,17 @@ import * as THREE from 'three';
       reveal(navLines, fields, LOOPS, bar, draw);
     }
     gsap.timeline({ onComplete: last })
-      .to(bar, { p: CFG.stops[0], duration: CFG.steps[0], ease: 'expo.inOut', onUpdate: draw });
+      .to(bar, { p: CFG.stops[0], duration: CFG.steps[0], ease: hillEase(false), onUpdate: draw });
+  }
+
+  function hillEase(end) {
+    var E = gsap.parseEase('expo.inOut'), c = CFG.flow, a = E(c), b = E(1 - c);
+    return end ? function (u) { return (E(1 - c + c * u) - b) / (1 - b); } : function (u) { return E(c * u) / a; };
   }
 
   function reveal(navLines, fields, LOOPS, bar, draw) {
     var tl = gsap.timeline({ onComplete: finish }), LS = CFG.steps[1];
-    tl.to(bar, { p: 100, duration: LS, ease: 'expo.inOut', onUpdate: draw }, 0);
+    tl.to(bar, { p: 100, duration: LS, ease: hillEase(true), onUpdate: draw }, 0);
     var A = Math.max(0, LS - CFG.lettersLead);
     tl.to(letters, { yPercent: 0, rotationX: 0, duration: 1.4, ease: 'expo.out', stagger: .035 }, A);
     if (pct) tl.to(pct.firstChild, { yPercent: -110, duration: .5, ease: 'power3.in', onComplete: function () { pct.remove(); } }, LS);
