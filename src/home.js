@@ -995,21 +995,13 @@ import * as THREE from 'three';
       reveal(navLines, fields, LOOPS, bar, draw);
     }
     gsap.timeline({ onComplete: last })
-      .to(bar, { p: CFG.stops[0], duration: CFG.steps[0], ease: ride(0, crawl * CFG.steps[0] / CFG.stops[0]), onUpdate: draw })
+      .to(bar, { p: CFG.stops[0], duration: CFG.steps[0], ease: 'expo.inOut', onUpdate: draw })
       .to(bar, { p: CFG.stops[1], duration: CFG.steps[1], ease: 'none', onUpdate: draw });
-  }
-
-  var crawl = (CFG.stops[1] - CFG.stops[0]) / CFG.steps[1];
-  function ride(v0, v1) {
-    return function (u) {
-      var u3 = u * u * u, u4 = u3 * u, u5 = u4 * u;
-      return v0 * (u - 6 * u3 + 8 * u4 - 3 * u5) + v1 * (-4 * u3 + 7 * u4 - 3 * u5) + (10 * u3 - 15 * u4 + 6 * u5);
-    };
   }
 
   function reveal(navLines, fields, LOOPS, bar, draw) {
     var tl = gsap.timeline({ onComplete: finish }), LS = CFG.steps[2];
-    tl.to(bar, { p: 100, duration: LS, ease: ride(crawl * LS / (100 - CFG.stops[1]), 0), onUpdate: draw }, 0);
+    tl.to(bar, { p: 100, duration: LS, ease: 'expo.inOut', onUpdate: draw }, 0);
     var A = Math.max(0, LS - CFG.lettersLead);
     tl.to(letters, { yPercent: 0, rotationX: 0, duration: 1.4, ease: 'expo.out', stagger: .035 }, A);
     if (pct) tl.to(pct.firstChild, { yPercent: -110, duration: .5, ease: 'power3.in', onComplete: function () { pct.remove(); } }, LS);
