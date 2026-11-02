@@ -576,7 +576,7 @@ import * as THREE from 'three';
     lens: .32, lensR: .17,
     fluid: {
       res: 320, size: 46, amt: .6, follow: .3, fade: 1.6, spread: .35, spreadIter: 1, hold: 3,
-      lift: .022, edgeIn: .05, edgeOut: .18
+      lift: .025, edgeIn: .05, edgeOut: .18
     },
     volume: .3, sound: true
   };
