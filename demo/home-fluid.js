@@ -576,7 +576,7 @@ import * as THREE from 'three';
     lens: .32, lensR: .17,
     fluid: {
       res: 320, size: 62, amt: .6, follow: .3, fade: 1.6, spread: .35, spreadIter: 1, hold: 3,
-      span: 22, lift: .036, rim: .03
+      lift: .06, edgeIn: .05, edgeOut: .18
     },
     volume: .3, sound: true
   };
@@ -689,29 +689,24 @@ import * as THREE from 'three';
     uniforms: {
       tMap: { value: rt.texture }, tDye: { value: dummy },
       uMouse: { value: new THREE.Vector2(.5, .5) }, uAmt: { value: 0 }, uRad: { value: CFG.lensR },
-      uRes: { value: new THREE.Vector2(1, 1) }, uTexel: { value: new THREE.Vector2(.01, .01) }, uSpan: { value: .02 },
+      uRes: { value: new THREE.Vector2(1, 1) }, uTexel: { value: new THREE.Vector2(.01, .01) },
       uAspect: { value: 1 }, uDpr: { value: 1 }, uTime: { value: 0 },
-      uFluid: { value: 0 }, uLift: { value: FL.lift }, uRim: { value: FL.rim },
+      uFluid: { value: 0 }, uLift: { value: FL.lift }, uEdge: { value: new THREE.Vector2(FL.edgeIn, FL.edgeOut) },
       uLineOn: { value: 0 }, uLineY: { value: .5 }, uLineS: { value: 0 }, uPad: { value: 16 }
     },
     vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader: [
       'uniform sampler2D tMap;uniform sampler2D tDye;',
       'uniform vec2 uMouse;uniform float uAmt;uniform float uRad;',
-      'uniform vec2 uRes;uniform vec2 uTexel;uniform float uSpan;',
+      'uniform vec2 uRes;uniform vec2 uTexel;',
       'uniform float uAspect;uniform float uDpr;uniform float uTime;',
-      'uniform float uFluid;uniform float uLift;uniform float uRim;',
+      'uniform float uFluid;uniform float uLift;uniform vec2 uEdge;',
       'uniform float uLineOn;uniform float uLineY;uniform float uLineS;uniform float uPad;',
       'varying vec2 vUv;',
       'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
       'float hh(vec2 p){vec2 t=uTexel*1.5;float s=texture2D(tDye,p).r*.4;s+=(texture2D(tDye,p+vec2(t.x,0.)).r+texture2D(tDye,p-vec2(t.x,0.)).r+texture2D(tDye,p+vec2(0.,t.y)).r+texture2D(tDye,p-vec2(0.,t.y)).r)*.15;return s;}',
       'void main(){',
-      ' float h=0.;vec2 g=vec2(0.);',
-      ' if(uFluid>.5){',
-      '  h=hh(vUv);',
-      '  vec2 e=vec2(uSpan/uAspect,uSpan);',
-      '  g=vec2(hh(vUv+vec2(e.x,0.))-hh(vUv-vec2(e.x,0.)),hh(vUv+vec2(0.,e.y))-hh(vUv-vec2(0.,e.y)))*.5;',
-      ' }',
+      ' float h=uFluid>.5?hh(vUv):0.;',
       ' vec2 d=vUv-uMouse;d.x*=uAspect;',
       ' float c=smoothstep(uRad,0.,length(d));',
       ' c=c*c*(3.-2.*c);',
@@ -719,8 +714,7 @@ import * as THREE from 'three';
       ' vec4 col=texture2D(tMap,uv);',
       ' col.rgb+=col.rgb*c*uAmt*.3;',
       ' vec4 card=vec4(col.rgb*col.a,col.a);',
-      ' float bgA=uLift*smoothstep(0.,.65,h);',
-      ' float rim=uRim*clamp(length(g)*4.,0.,1.)*smoothstep(0.,.2,h);',
+      ' float bgA=uLift*smoothstep(uEdge.x,uEdge.y,h);',
       ' float la=0.;',
       ' if(uLineOn>.5){',
       '  vec2 ul=vUv;',
@@ -731,8 +725,8 @@ import * as THREE from 'three';
       '  float inX=smoothstep(uPad-.5,uPad+.5,xp)*(1.-smoothstep(uPad+(uRes.x-2.*uPad)*uLineS-.5,uPad+(uRes.x-2.*uPad)*uLineS+.5,xp));',
       '  la=.25*cov*inX;',
       ' }',
-      ' float ua=1.-(1.-clamp(bgA+rim,0.,1.))*(1.-la);',
-      ' ua+=(hash(gl_FragCoord.xy+fract(uTime)*91.7)-.5)*.006*step(.001,bgA+rim);',
+      ' float ua=1.-(1.-bgA)*(1.-la);',
+      ' ua+=(hash(gl_FragCoord.xy+fract(uTime)*91.7)-.5)*.006*step(.001,bgA);',
       ' ua=clamp(ua,0.,1.);',
       ' vec4 under=vec4(vec3(ua),ua);',
       ' gl_FragColor=card+under*(1.-card.a);',
@@ -833,7 +827,7 @@ import * as THREE from 'three';
       rt.setSize(Math.round(W * DPR), Math.round(H * DPR));
       cam.left = -W / 2; cam.right = W / 2; cam.top = H / 2; cam.bottom = -H / 2; cam.updateProjectionMatrix();
       var pu0 = post.material.uniforms;
-      pu0.uAspect.value = W / H; pu0.uRes.value.set(W, H); pu0.uDpr.value = DPR; pu0.uPad.value = REM; pu0.uSpan.value = FL.span / H; pu0.uLineY.value = 1 - cy / H;
+      pu0.uAspect.value = W / H; pu0.uRes.value.set(W, H); pu0.uDpr.value = DPR; pu0.uPad.value = REM; pu0.uLineY.value = 1 - cy / H;
       pu0.uLineOn.value = mob ? 0 : 1;
       line.style.opacity = mob ? '' : '0';
       pu0.uFluid.value = !mob && !reduce ? 1 : 0;
