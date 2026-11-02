@@ -575,8 +575,8 @@ import * as THREE from 'three';
     bendDesk: .12, bendMob: .14, bendMobEdge: .1,
     lens: .32, lensR: .17,
     fluid: {
-      res: 320, size: 62, amt: .6, follow: .3, fade: 1.6, spread: .35, spreadIter: 1, hold: 3,
-      lift: .06, edgeIn: .05, edgeOut: .18
+      res: 320, size: 46, amt: .6, follow: .3, fade: 1.6, spread: .35, spreadIter: 1, hold: 3,
+      lift: .022, edgeIn: .05, edgeOut: .18
     },
     volume: .3, sound: true
   };
