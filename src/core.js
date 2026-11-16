@@ -1,0 +1,201 @@
+// ------------- iOS SCROLL LOCK ------------- //
+
+(function () {
+  var isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!isIOS || (window.Webflow && Webflow.env && Webflow.env('editor'))) return;
+  var body = document.body, root = document.createElement('div');
+  root.id = 'scroll-root';
+  while (body.firstChild) root.appendChild(body.firstChild);
+  body.appendChild(root);
+  document.documentElement.classList.add('ios-scroll-lock');
+  window.__scroller = root;
+})();
+
+
+
+// ------------- LENIS ------------- //
+
+window.lenis = null;
+if (window.Lenis && !(window.Webflow && Webflow.env && Webflow.env('editor')) && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  const l = window.lenis = new Lenis({ lerp: .1, wheelMultiplier: 1.1 });
+  (function raf(t) { l.raf(t); requestAnimationFrame(raf); })(performance.now());
+}
+
+
+
+// ------------- OSPLY CORE: GSAP loader + shared effects ------------- //
+
+(function () {
+  var GS = 'https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/', ready = null;
+  function load(f) { return new Promise(function (ok, no) { var s = document.createElement('script'); s.src = GS + f; s.async = false; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); }
+  function domReady() { return new Promise(function (ok) { document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', ok) : ok(); }); }
+  function gsapReady() {
+    return ready || (ready = domReady()
+      .then(function () {
+        return Promise.all([
+          window.gsap || load('gsap.min.js'),
+          window.ScrollTrigger || load('ScrollTrigger.min.js'),
+          window.SplitText || load('SplitText.min.js')
+        ]);
+      })
+      .then(function () {
+        gsap.registerPlugin(ScrollTrigger, SplitText);
+        if (window.__scroller) ScrollTrigger.defaults({ scroller: window.__scroller });
+        if (typeof lenis !== 'undefined' && lenis) lenis.on('scroll', ScrollTrigger.update);
+      }));
+  }
+  function linkFx(root) {
+    if (!matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    [].slice.call(root.querySelectorAll('.overview-link')).forEach(function (a) {
+      if (a._fx) return; a._fx = 1;
+      var bg = a.querySelector('.background-link'), tx = a.querySelector('.website-text > *') || a.querySelector('.website-text');
+      var a1 = a.querySelector('.arrow-link-1'), a2 = a.querySelector('.arrow-link-2');
+      var cl = { t: 100, b: 0 }, col = tx ? getComputedStyle(tx).color : '', D = .6, E = 'power3.out';
+      function clip() { if (bg) bg.style.clipPath = 'inset(' + cl.t.toFixed(2) + '% 0% ' + cl.b.toFixed(2) + '% 0%)'; }
+      if (bg) { bg.style.height = '100%'; clip(); }
+      if (a2) gsap.set(a2, { top: 0, left: 0, x: 0, y: 0, xPercent: -100, yPercent: 100 });
+      if (a1) gsap.set(a1, { x: 0, y: 0, xPercent: 0, yPercent: 0 });
+      a.addEventListener('mouseenter', function () {
+        gsap.killTweensOf(cl);
+        if (cl.b >= 99.9) { cl.t = 100; cl.b = 0; }
+        gsap.to(cl, { t: 0, b: 0, duration: D, ease: E, onUpdate: clip });
+        if (tx) gsap.to(tx, { color: '#000', duration: .35, ease: 'power2.out', overwrite: 'auto' });
+        if (a1) gsap.to(a1, { xPercent: 100, yPercent: -100, duration: D, ease: E, overwrite: 'auto' });
+        if (a2) gsap.to(a2, { xPercent: 0, yPercent: 0, duration: D, ease: E, overwrite: 'auto' });
+      });
+      a.addEventListener('mouseleave', function () {
+        gsap.killTweensOf(cl);
+        gsap.to(cl, { b: 100, duration: D, ease: E, onUpdate: clip, onComplete: function () { cl.t = 100; cl.b = 0; clip(); } });
+        if (tx) gsap.to(tx, { color: col, duration: .35, ease: 'power2.out', overwrite: 'auto', onComplete: function () { tx.style.color = ''; } });
+        if (a1) gsap.to(a1, { xPercent: 0, yPercent: 0, duration: D, ease: E, overwrite: 'auto' });
+        if (a2) gsap.to(a2, { xPercent: -100, yPercent: 100, duration: D, ease: E, overwrite: 'auto' });
+      });
+    });
+  }
+  function arrowFx(root) {
+    var tls = [];
+    [].slice.call(root.querySelectorAll('.arrow-mask')).forEach(function (m) {
+      var ar = m.querySelectorAll('.arrow-1, .arrow-2');
+      if (!ar.length || m._fx) return; m._fx = 1;
+      tls.push(gsap.timeline({ repeat: -1, repeatDelay: 1, delay: 1 }).fromTo(ar, { yPercent: 0 }, { yPercent: 200, duration: 1, ease: 'expo.out' }));
+    });
+    return tls;
+  }
+  window.osply = { gsap: gsapReady, linkFx: linkFx, arrowFx: arrowFx };
+})();
+
+
+
+// ------------- TEXT REVEAL ON SCROLL ------------- //
+
+(function () {
+  var sel = '[data-split="heading"]';
+  if (!document.querySelector(sel)) return;
+  function show() { document.querySelectorAll(sel).forEach(function (el) { el.style.opacity = 1; }); }
+  function portraitAbout(h) { return matchMedia('(orientation:portrait) and (max-width:820px),(orientation:portrait) and (hover:none) and (pointer:coarse)').matches && !!document.querySelector('.basalt-hero') && !!h.closest('.section-about'); }
+  var fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+  Promise.all([osply.gsap(), fonts]).then(function () {
+    gsap.set(sel, { opacity: 1 });
+    function reveal(h, split, prepared) {
+      var delay = prepared ? 0 : parseFloat(h.getAttribute('data-split-delay')) || 0;
+      var tl = gsap.timeline({ scrollTrigger: { trigger: h, start: 'top 90%', once: true }, delay: delay });
+      if (prepared) tl.to(split.lines, { yPercent: 0, opacity: 1, duration: 1.2, stagger: .08, ease: 'power4.out' });
+      else tl.from(split.lines, { yPercent: 110, opacity: 0, duration: 1.2, stagger: .08, ease: 'power4.out' });
+    }
+    document.querySelectorAll(sel).forEach(function (h) {
+      if (h.closest('.hero-title')) return;
+      var split = SplitText.create(h, { type: 'lines', mask: 'lines', linesClass: 'line', aria: 'none' });
+      if (!portraitAbout(h)) { reveal(h, split, false); return; }
+      gsap.set(split.lines, { yPercent: 110, opacity: 0 });
+      var started = false, timer;
+      function start() { if (started) return; started = true; clearTimeout(timer); reveal(h, split, true); }
+      if (window.__aboutTitleRevealed) start();
+      else { addEventListener('about:title-revealed', start, { once: true }); timer = setTimeout(start, 800); }
+    });
+  }).catch(show);
+  setTimeout(function () { if (!window.SplitText) show(); }, 6000);
+})();
+
+
+
+// ------------- COPY EMAIL ------------- //
+
+(function () {
+  if (window.Webflow && Webflow.env && Webflow.env('editor')) return;
+  var EMAIL = 'hi@osply.co', LABEL = 'Email Copied', HOLD = 2000, DUR = 600, EASE = 'cubic-bezier(.87,0,.13,1)';
+  function find(el) {
+    var a = el && el.closest ? el.closest('a, button') : null;
+    if (!a) return null;
+    if (a.hasAttribute('data-copy')) return a;
+    return a.closest('.nav') && a.textContent.trim().toLowerCase() === 'contact' ? a : null;
+  }
+  function legacy(t) {
+    var ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+  }
+  function copy(t) {
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).catch(function () { legacy(t); });
+    else legacy(t);
+  }
+  function move(el, y, animate) {
+    el.style.transition = animate ? 'transform ' + DUR + 'ms ' + EASE : 'none';
+    el.style.transform = 'translateY(' + y + '%)';
+  }
+  function swap(a) {
+    if (!a._cc) {
+      var label = a.textContent.trim();
+      a.innerHTML = '<span class="cc-mask"><span class="cc-a"></span><span class="cc-b" aria-hidden="true"></span></span>';
+      var A = a.querySelector('.cc-a'), B = a.querySelector('.cc-b');
+      A.textContent = label; B.textContent = a.getAttribute('data-copy-label') || LABEL;
+      move(A, 0, false); move(B, 110, false);
+      a.offsetHeight;
+      a._cc = { A: A, B: B, busy: false };
+    }
+    var c = a._cc;
+    if (c.busy) return;
+    c.busy = true;
+    move(c.A, -110, true); move(c.B, 0, true);
+    setTimeout(function () {
+      move(c.A, 110, false); c.A.offsetHeight;
+      move(c.A, 0, true); move(c.B, -110, true);
+      setTimeout(function () { move(c.B, 110, false); c.busy = false; }, DUR);
+    }, HOLD);
+  }
+  document.addEventListener('click', function (e) {
+    var a = find(e.target);
+    if (!a) return;
+    e.preventDefault();
+    copy(a.getAttribute('data-copy') || EMAIL);
+    swap(a);
+  });
+})();
+
+
+
+// ------------- FOOTER LOGO ON SCROLL ------------- //
+
+(function () {
+  if (document.documentElement.classList.contains('w-editor')) return;
+  var footer = document.querySelector('.footer');
+  var logo = footer && footer.querySelector('.footer-logo');
+  var wraps = logo ? [].slice.call(logo.querySelectorAll('[class*="logo-wrap"]')) : [];
+  if (!wraps.length) return;
+  var H = [], state = { p: 0 };
+  function measure() {
+    logo.style.minHeight = '';
+    wraps.forEach(function (w) { w.style.height = ''; });
+    H = wraps.map(function (w) { return w.getBoundingClientRect().height; });
+    logo.style.minHeight = logo.getBoundingClientRect().height + 'px';
+    logo.style.justifyContent = 'flex-end';
+  }
+  function apply() { wraps.forEach(function (w, i) { w.style.height = (H[i] * state.p).toFixed(2) + 'px'; }); }
+  measure(); apply();
+  osply.gsap().then(function () {
+    ScrollTrigger.addEventListener('refreshInit', measure);
+    gsap.to(state, { p: 1, ease: 'none', onUpdate: apply, scrollTrigger: { trigger: footer, start: 'top bottom', end: 'bottom bottom', scrub: true, onRefresh: apply } });
+    ScrollTrigger.refresh();
+  }, function () { state.p = 1; apply(); });
+})();

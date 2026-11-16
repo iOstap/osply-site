@@ -1,0 +1,24 @@
+<script>
+// ------------- WORK BOOT ------------- //
+
+(function () {
+  var d = document.documentElement;
+  if (d.classList.contains('w-editor')) return;
+  d.classList.add('pm-js');
+  setTimeout(function () { if (!window.__pmReady) d.classList.remove('pm-js'); }, 6000);
+})();
+</script>
+
+
+<style>
+/* ------------- WORK PAGE ------------- */
+
+[data-pm="list"]>*{transform:translate3d(0,var(--iy,0px),0)}
+html.pm-js:not(.w-editor) [data-pm-text]{visibility:hidden}
+html.pm-js:not(.w-editor) [data-pm-fade]{opacity:0}
+html.pm-js:not(.w-editor) [data-pm="list"]>*{opacity:0}
+@media (hover:hover) and (pointer:fine){
+.overview-link .website-text>*{transition:opacity .35s}
+.overview-link:hover .website-text>*{opacity:1!important}
+}
+</style>

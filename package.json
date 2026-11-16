@@ -1,0 +1,10 @@
+{
+  "name": "osply-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Custom scripts for osply.co",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "for f in core work home about; do bun build src/$f.js --no-bundle --minify --outfile dist/$f.min.js; done"
+  }
+}

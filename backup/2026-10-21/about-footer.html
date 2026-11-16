@@ -1,0 +1,389 @@
+<script type="application/json" id="basalt3d-config">{"mesh":{"v":6416,"i":33723,"lo":[-0.69,-0.39864345788955685,-0.49233993530273434],"sc":[2.105745021744106e-05,1.2165818505823054e-05,1.5025251706805046e-05],"n":150854},"vfov":25,"pivot":[0,0,-3.6],"bg":"#ababab","fogNear":3.6,"fogFar":7.0,"rayOp":0.2,"vig":0.25,"rocks":[{"p":[-1.5,0.1,-4.6],"r":[180,60,90],"s":3.4,"bake":"https://cdn.prod.website-files.com/672b64cf4007da092c519e05/6aca0f1f30ad05481f41ca4d_ash-bake-0.webp","gain":1.0},{"p":[1.3,0,-3.2],"r":[0,130,-90],"s":2.9,"bake":"https://cdn.prod.website-files.com/672b64cf4007da092c519e05/6aca15665f21a498cf6ab454_ash-bake-1b.webp","gain":1.7},{"p":[-0.2,-0.62,-2.2],"r":[10,30,0],"s":0.9,"bake":"https://cdn.prod.website-files.com/672b64cf4007da092c519e05/6aca0f1fea8c80b0695cd81c_ash-bake-2.webp","gain":0.75,"contrast":0.65,"soften":1.3}],"smoke":[{"p":[0,-0.66,-1.7],"w":2.4,"h":0.6,"op":0.7,"sp":0.04,"seed":1,"c":"#e2e2e2"},{"p":[0.2,-0.55,-2.6],"w":3.4,"h":0.9,"op":0.5,"sp":0.028,"seed":2,"c":"#dedede"},{"p":[-0.25,0.05,-3.65],"w":1.3,"h":2.4,"op":0.32,"sp":0.02,"seed":3,"c":"#d0d0d0","edge":[0.0,0.25,0.35,0.35]},{"p":[0.6,-0.3,-3.0],"w":1.6,"h":1.2,"op":0.25,"sp":0.024,"seed":4}],"rays":[{"p":[0.12,0.3,-4.3],"w":0.9,"h":3.4,"rz":0.08},{"p":[0.32,0.4,-4.5],"w":0.7,"h":3.4,"rz":-0.05},{"p":[-0.05,0.2,-4.1],"w":0.55,"h":3.2,"rz":0.12},{"p":[0.2,0.3,-3.9],"w":0.4,"h":2.8,"rz":0.02}],"model":"https://cdn.prod.website-files.com/672b64cf4007da092c519e05/6ac94f7679ff41d200ec11f8_sharp-mesh.png","portrait":{"vfov":40,"shift":[0.05,0.08],"rocks":[{"dp":[0,0.35,0]},{"dp":[-0.15,0.15,0.2]},{"dp":[0.3,-0.2,0.3],"ds":1.15}]},"ca":-0.24,"scroll":{"down":0.25,"back":0.175,"yaw":0.006,"roll":0},"mouse":{"yaw":-0.09,"roll":-0.018,"shift":-0.022},"mobileSway":0.2,"introBack":1.6,"mobileRest":-0.85}</script>
+
+
+
+<script type="module">
+// ------------- ABOUT: BASALT 3D HERO ------------- //
+
+const root = document.querySelector('[data-basalt3d]');
+const portrait = matchMedia('(orientation:portrait) and (max-width:820px),(orientation:portrait) and (hover:none) and (pointer:coarse)');
+function releaseTitle(){if(window.__basaltTitle)return;window.__basaltTitle=true;dispatchEvent(new Event('basalt3d:title'));}
+if(root&&!document.documentElement.classList.contains('w-editor')){if(portrait.matches){requestAnimationFrame(releaseTitle);}else{import('three').then(function(THREE){init(root,THREE);}).catch(function(e){console.error('[basalt3d]',e);releaseTitle();});}}
+function init(root,THREE) {
+  const A = JSON.parse(document.getElementById('basalt3d-config').textContent);
+  const host = root.querySelector('[data-basalt3d-canvas]');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const mobile = !fine || Math.min(innerWidth, innerHeight) < 700;
+  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', alpha: false });
+  let dpr = Math.min(devicePixelRatio || 1, mobile ? 1.25 : 1.5);
+  renderer.setPixelRatio(dpr);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NoToneMapping;
+  host.appendChild(renderer.domElement);
+  let texOK = false, meshOK = false, ready = false, t0 = -1, titled = false;
+  const reveal = () => {
+    if (!texOK || !meshOK || ready) return;
+    ready = true; t0 = performance.now(); resize(); frame();
+    requestAnimationFrame(() => host.classList.add('is-ready'));
+    wake();
+  };
+  THREE.DefaultLoadingManager.onLoad = () => { texOK = true; reveal(); };
+  setTimeout(() => { texOK = true; reveal(); }, 8000);
+
+  const BG = new THREE.Color(A.bg);
+  const scene = new THREE.Scene();
+  scene.background = BG;
+  scene.fog = new THREE.Fog(BG, A.fogNear, A.fogFar);
+  renderer.setClearColor(BG, 1);
+
+  const rig = new THREE.Group(); rig.position.set(...A.pivot); scene.add(rig);
+  const camera = new THREE.PerspectiveCamera(A.vfov, 16 / 9, .05, 60);
+  const camBase = new THREE.Vector3(0, 0, 0).sub(rig.position);
+  camera.position.copy(camBase); rig.add(camera);
+
+  const tl = new THREE.TextureLoader();
+  const tex = url => { const t = tl.load(url); t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); return t; };
+
+  const rockMats = A.rocks.map(r => {
+    const m = new THREE.MeshBasicMaterial({ map: tex(r.bake), fog: true });
+    m.color.setScalar(r.gain ?? 1);
+    const ct = r.contrast ?? 1, sf = r.soften ?? 0;
+    if (ct !== 1 || sf) {
+      m.onBeforeCompile = s => { s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', `#ifdef USE_MAP
+        vec4 sampledDiffuseColor = texture2D( map, vMapUv, ${sf.toFixed(2)} );
+        float lumC = 0.08; sampledDiffuseColor.rgb = max( vec3( lumC ) + ( sampledDiffuseColor.rgb - vec3( lumC ) ) * ${ct.toFixed(3)}, 0. );
+        diffuseColor *= sampledDiffuseColor;
+        #endif`); };
+      m.customProgramCacheKey = () => 'rock' + ct + '_' + sf;
+    }
+    return m;
+  });
+  const rockMeshes = [];
+  let portraitK = 0;
+  function placeRocks() {
+    A.rocks.forEach((r, n) => {
+      const mesh = rockMeshes[n]; if (!mesh) return;
+      const o = A.portrait.rocks[n] || {}, k = portraitK;
+      const p = r.p.map((v, i) => v + (o.dp || [0, 0, 0])[i] * k), s = r.s * (1 + ((o.ds ?? 1) - 1) * k);
+      mesh.matrix.compose(new THREE.Vector3(...p), new THREE.Quaternion().setFromEuler(new THREE.Euler(...r.r.map(d => d * Math.PI / 180), 'YXZ')), new THREE.Vector3(s, s, s));
+      mesh.matrixWorldNeedsUpdate = true;
+    });
+  }
+  const onMesh = (h, raw) => {
+    let o = 0; const take = (T, n) => { const a = new T(raw, o, n); o += n * T.BYTES_PER_ELEMENT; return a; };
+    const q = take(Uint16Array, h.v * 3), uv = take(Uint16Array, h.v * 2), idx = take(Uint16Array, h.i), nrm = take(Int8Array, h.v * 3);
+    const pos = new Float32Array(h.v * 3);
+    for (let i = 0; i < h.v * 3; i++) pos[i] = h.lo[i % 3] + q[i] * h.sc[i % 3];
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3, true));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2, true));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    A.rocks.forEach((r, n) => {
+      const mesh = new THREE.Mesh(geo, rockMats[n]);
+      mesh.matrixAutoUpdate = false; mesh.renderOrder = 0; scene.add(mesh); rockMeshes[n] = mesh;
+    });
+    placeRocks();
+    meshOK = true; reveal();
+  };
+  fetch(A.model, { mode: 'cors' }).then(r => r.blob())
+    .then(b => createImageBitmap(b, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' }))
+    .then(bmp => {
+      const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+      const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(bmp, 0, 0);
+      const px = g.getImageData(0, 0, bmp.width, bmp.height).data, n = A.mesh.n, out = new Uint8Array(n);
+      for (let i = 0, j = 0; j < n; i += 4) { out[j++] = px[i]; if (j < n) out[j++] = px[i + 1]; if (j < n) out[j++] = px[i + 2]; }
+      onMesh(A.mesh, out.buffer);
+    }).catch(e => console.error('[basalt3d]', e));
+
+  const dRT = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true });
+  dRT.depthTexture = new THREE.DepthTexture(1, 1); dRT.depthTexture.type = THREE.UnsignedIntType;
+  const SOFTU = () => ({ dTex: { value: dRT.depthTexture }, cn: { value: camera.near }, cf: { value: camera.far }, vres: { value: new THREE.Vector2(1, 1) } });
+  const SOFT = `#include <packing>
+    uniform sampler2D dTex; uniform float cn, cf; uniform vec2 vres; varying float vVz;
+    float soft(float k){ float d=texture2D(dTex, gl_FragCoord.xy/vres).x; float sz=perspectiveDepthToViewZ(d,cn,cf); return smoothstep(0.,k,vVz-sz); }`;
+  const softMats = [];
+  const NOISE = `
+    float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
+    float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+      return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }
+    float fbm(vec2 p){ float a=0.5, s=0.; for(int i=0;i<5;i++){ s+=a*vn(p); p=p*2.03+vec2(17.1,9.3); a*=0.5; } return s; }`;
+
+  const smokeMat = o => new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, fog: false,
+    uniforms: { ...SOFTU(), time: { value: 0 }, op: { value: o.op }, sp: { value: o.sp }, col: { value: new THREE.Color(o.c ?? '#d8d8d8') }, seed: { value: o.seed }, edge: { value: new THREE.Vector4(...(o.edge || [0, .35, .15, .15])) } },
+    vertexShader: 'varying vec2 vUv; varying float vVz; void main(){ vUv=uv; vec4 mv=modelViewMatrix*vec4(position,1.); vVz=mv.z; gl_Position=projectionMatrix*mv; }',
+    fragmentShader: SOFT + NOISE + `varying vec2 vUv; uniform float time, op, sp, seed; uniform vec3 col; uniform vec4 edge;
+      void main(){
+        vec2 p=vUv*vec2(3.2,1.6)+vec2(seed*7.1,seed*3.3);
+        vec2 w=vec2(fbm(p+vec2(time*sp,time*sp*0.3)), fbm(p+vec2(5.2,1.3)-vec2(time*sp*0.7,0.)));
+        float d=smoothstep(0.32,0.85,fbm(p*1.3+w*1.7+vec2(time*sp*0.5,0.)));
+        float m=smoothstep(edge.x,edge.y,vUv.y)*smoothstep(1.,1.-edge.y,vUv.y)*smoothstep(0.,edge.z,vUv.x)*smoothstep(1.,1.-edge.w,vUv.x);
+        gl_FragColor=vec4(col, d*m*op*soft(0.45));
+      }` });
+  const smokes = A.smoke.map(o => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(o.w, o.h), smokeMat(o)); softMats.push(m.material);
+    m.position.set(...o.p); m.renderOrder = 2; scene.add(m);
+    return m;
+  });
+
+  const rayMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+    uniforms: { ...SOFTU(), time: { value: 0 }, op: { value: A.rayOp } },
+    vertexShader: 'attribute float seed; varying vec2 vUv; varying float vs; varying float vVz; void main(){ vUv=uv; vs=seed; vec4 mv=modelViewMatrix*instanceMatrix*vec4(position,1.); vVz=mv.z; gl_Position=projectionMatrix*mv; }',
+    fragmentShader: SOFT + NOISE + `varying vec2 vUv; varying float vs; uniform float time, op;
+      void main(){
+        float x=clamp(abs(vUv.x-0.5)*2.,0.,1.); float core=exp(-x*x*2.6)*(1.-x);
+        float streak=fbm(vec2(vUv.x*2.+vs*13., vUv.y*0.8-time*0.04));
+        float fadeY=smoothstep(0.,0.35,vUv.y)*smoothstep(1.,0.55,vUv.y);
+        float pulse=0.55+0.45*sin(time*0.35+vs*6.283);
+        gl_FragColor=vec4(vec3(1.,0.99,0.97), clamp(core*fadeY*(0.6+0.5*streak)*pulse*op*soft(0.6),0.,1.));
+      }` });
+  softMats.push(rayMat);
+  const rayMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), rayMat, A.rays.length);
+  {
+    const seeds = new Float32Array(A.rays.length), m = new THREE.Matrix4(), q = new THREE.Quaternion();
+    A.rays.forEach((r, i) => {
+      seeds[i] = Math.random();
+      q.setFromEuler(new THREE.Euler(0, 0, r.rz)); m.compose(new THREE.Vector3(...r.p), q, new THREE.Vector3(r.w, r.h, 1)); rayMesh.setMatrixAt(i, m);
+    });
+    rayMesh.geometry.setAttribute('seed', new THREE.InstancedBufferAttribute(seeds, 1));
+    rayMesh.renderOrder = 3; rayMesh.frustumCulled = false; scene.add(rayMesh);
+  }
+
+  const rt = new THREE.WebGLRenderTarget(1, 1, { samples: mobile ? 0 : 4, type: THREE.HalfFloatType });
+  const small = [0, 1].map(() => new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType }));
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); const postScene = new THREE.Scene(); postScene.add(quad);
+  const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const vs = 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }';
+  const blurMat = new THREE.ShaderMaterial({ vertexShader: vs, uniforms: { t: { value: null }, dir: { value: new THREE.Vector2() } },
+    fragmentShader: `varying vec2 vUv; uniform sampler2D t; uniform vec2 dir;
+      void main(){ vec3 s=texture2D(t,vUv).rgb*0.227;
+        s+=(texture2D(t,vUv+dir*1.384).rgb+texture2D(t,vUv-dir*1.384).rgb)*0.316; s+=(texture2D(t,vUv+dir*3.23).rgb+texture2D(t,vUv-dir*3.23).rgb)*0.07;
+        gl_FragColor=vec4(s,1.); }` });
+  const finalMat = new THREE.ShaderMaterial({ vertexShader: vs,
+    uniforms: { t: { value: rt.texture }, b: { value: small[1].texture }, time: { value: 0 }, res: { value: new THREE.Vector2(1, 1) } },
+    fragmentShader: `varying vec2 vUv; uniform sampler2D t,b; uniform float time; uniform vec2 res;
+      float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
+      vec3 spec(float t){ float lo=step(t,0.5); float w=clamp(1.-abs(2.*clamp((t-1./6.)/(4./6.),0.,1.)-1.),0.,1.);
+        return pow(vec3(lo,1.,1.-lo)*vec3(1.-w,w,1.-w),vec3(1./2.2)); }
+      vec2 barrel(vec2 c,float a){ vec2 cc=c-0.5; return c+cc*dot(cc,cc)*a; }
+      void main(){
+        vec2 uv2=vUv*(1.-vUv.yx); float vig=pow(uv2.x*uv2.y*20.,0.5);
+        vec3 sum=vec3(0.), sw=vec3(0.);
+        for(int i=0;i<7;i++){ float k=float(i)/7.; vec3 w=spec(k); sw+=w; sum+=w*texture2D(t,barrel(vUv,${A.ca.toFixed(3)}*k)).rgb; }
+        vec3 c=mix(max(texture2D(b,vUv).rgb,0.),max(sum/sw,0.),clamp(vig,0.,1.));
+        c+=(h(floor(vUv*res/1.5)+fract(time*7.)*61.)-0.5)*0.03;
+        float v=length((vUv-0.5)*vec2(1.,0.8)); c*=1.-smoothstep(0.45,0.95,v)*${A.vig.toFixed(2)};
+        gl_FragColor=vec4(c,1.);
+      }` });
+
+  function resize() {
+    const r = host.getBoundingClientRect(), W = Math.max(1, r.width), H = Math.max(1, r.height);
+    renderer.setPixelRatio(dpr); renderer.setSize(W, H, false);
+    const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
+    dRT.setSize(pw >> 1, ph >> 1); softMats.forEach(m => m.uniforms.vres.value.set(pw, ph)); rt.setSize(pw, ph); small.forEach(s => s.setSize(pw >> 2, ph >> 2)); finalMat.uniforms.res.value.set(pw, ph);
+    const aspect = W / H, AD = 16 / 9, VF = A.vfov * Math.PI / 180, PT = A.portrait;
+    camera.aspect = aspect;
+    portraitK = 0; placeRocks();
+    if (aspect >= AD) { camera.fov = A.vfov; camera.updateProjectionMatrix(); return; }
+    const k = Math.min(Math.max((aspect - .5) / (AD - .5), 0), 1), sm = k * k * (3 - 2 * k);
+    portraitK = 1 - sm; placeRocks();
+    camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(PT.vfov * Math.PI / 360) * (1 - sm) + Math.tan(VF / 2) * sm));
+    camera.updateProjectionMatrix();
+    camera.projectionMatrix.elements[8] += PT.shift[0] * (1 - sm); camera.projectionMatrix.elements[9] += PT.shift[1] * (1 - sm);
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+  }
+  const MR = fine ? 0 : A.mobileRest;
+  let tx = MR, ty = 0, cx = MR, cy = 0, ts = 0, cs = 0;
+  if (fine) {
+    addEventListener('pointermove', e => {
+      const r = host.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { tx = ty = 0; return; }
+      tx = (e.clientX - r.left) / r.width * 2 - 1; ty = (e.clientY - r.top) / r.height * 2 - 1;
+    }, { passive: true });
+    document.addEventListener('pointerleave', () => { tx = ty = 0; });
+  }
+  const sy = () => { const s = window.__scroller; return s && s.scrollHeight > s.clientHeight ? s.scrollTop : (scrollY || document.documentElement.scrollTop || 0); };
+  const scrollTarget = () => { ts = Math.min(Math.max(sy() / Math.max(1, root.offsetHeight), 0), 1); };
+  document.addEventListener('scroll', scrollTarget, { passive: true, capture: true });
+  addEventListener('resize', () => { resize(); scrollTarget(); }, { passive: true });
+  const clock = new THREE.Clock(); let raf = 0, visible = true;
+  const SC = A.scroll, MO = A.mouse, PV = rig.position.clone(), RS = [.035, .08, .03], SW = A.mobileSway;
+  function frame() {
+    const dt0 = clock.getDelta(), t = clock.elapsedTime;
+    if (!fine && !reduce) { tx = MR + Math.sin(t * .13) * SW; ty = Math.cos(t * .11) * SW * .6; }
+    const dt = Math.min(dt0, .1), dk = 1 - Math.exp(-2 * dt);
+    cx += (tx - cx) * dk; cy += (ty - cy) * dk; cs += (ts - cs) * (1 - Math.exp(-4 * dt)); if (!Number.isFinite(cs)) cs = 0;
+    rig.rotation.set(RS[0] + Math.sin(t * .07) * .004, RS[1] - cx * MO.yaw - cs * SC.yaw + Math.sin(t * .05) * .006, RS[2] - cx * MO.roll + cs * SC.roll);
+    rig.position.set(PV.x - cx * MO.shift, PV.y, PV.z);
+    const it = t0 < 0 ? 0 : Math.max(0, (performance.now() - t0) / 3000);
+    const intro = reduce || it >= 1 ? 0 : Math.pow(2, -10 * it);
+    camera.position.set(camBase.x, camBase.y - cs * SC.down + intro * .12, camBase.z + cs * SC.back + intro * A.introBack);
+    camera.lookAt(rig.localToWorld(new THREE.Vector3(0, 0, 0)).setY(camera.getWorldPosition(new THREE.Vector3()).y));
+    for (const s of smokes) s.material.uniforms.time.value = t;
+    rayMat.uniforms.time.value = t;
+    for (const s of smokes) s.visible = false; rayMesh.visible = false; scene.background = null;
+    renderer.setRenderTarget(dRT); renderer.clear(); renderer.render(scene, camera);
+    for (const s of smokes) s.visible = true; rayMesh.visible = true; scene.background = BG;
+    renderer.setRenderTarget(rt); renderer.render(scene, camera);
+    quad.material = blurMat;
+    blurMat.uniforms.t.value = rt.texture; blurMat.uniforms.dir.value.set(2.5 / small[0].width, 0); renderer.setRenderTarget(small[0]); renderer.render(postScene, postCam);
+    blurMat.uniforms.t.value = small[0].texture; blurMat.uniforms.dir.value.set(0, 2.5 / small[0].height); renderer.setRenderTarget(small[1]); renderer.render(postScene, postCam);
+    blurMat.uniforms.t.value = small[1].texture; blurMat.uniforms.dir.value.set(6 / small[0].width, 0); renderer.setRenderTarget(small[0]); renderer.render(postScene, postCam);
+    blurMat.uniforms.t.value = small[0].texture; blurMat.uniforms.dir.value.set(0, 6 / small[0].height); renderer.setRenderTarget(small[1]); renderer.render(postScene, postCam);
+    if (!titled && t0 >= 0) { titled = true; window.__basaltTitle = true; dispatchEvent(new Event('basalt3d:title')); }
+    quad.material = finalMat; finalMat.uniforms.time.value = t % 100;
+    renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+  }
+  const past = () => sy() > root.offsetHeight * 1.05;
+  let act = 0, skip = false, gap = 16, lastT = 0, adaptAt = 0;
+  function loop() {
+    raf = 0;
+    if (!visible || !ready || past()) { lastT = 0; return; }
+    const now = performance.now();
+    if (lastT && now - lastT < 500) gap += (now - lastT - gap) * .15;
+    lastT = now;
+    if (gap > 45 && dpr > .5 && now - adaptAt > 1000) { adaptAt = now; dpr = Math.max(.5, dpr * .8); resize(); }
+    const idle = now - act > 2000 && now - t0 > 6200;
+    if (idle && gap > 100) { lastT = 0; return; }
+    skip = !skip && idle;
+    if (!skip) frame();
+    if (!reduce) raf = requestAnimationFrame(loop);
+  }
+  function wake() { act = performance.now(); if (!raf && visible && ready && !past()) raf = requestAnimationFrame(loop); }
+  new IntersectionObserver(([en]) => { visible = en.isIntersecting; if (visible) wake(); }).observe(root);
+  document.addEventListener('scroll', wake, { passive: true, capture: true });
+  addEventListener('pointermove', wake, { passive: true });
+  addEventListener('touchstart', wake, { passive: true });
+  new ResizeObserver(() => { resize(); scrollTarget(); wake(); }).observe(host);
+  resize(); scrollTarget();
+}
+</script>
+
+
+
+<script>
+// ------------- ABOUT: HERO TITLE ------------- //
+
+(function () {
+  var imgs = [].slice.call(document.querySelectorAll('.hero-title .hero-letter img'));
+  var wrap = document.querySelector('.hero-top .nav');
+  if (!imgs.length && !wrap) return;
+  var played = false, DUR = 1400, STAGGER = 35, GRID_DUR = 1000, GRID_EASE = 'cubic-bezier(.16,1,.3,1)';
+  var EASE = (function () {
+    if (!window.CSS || !CSS.supports('animation-timing-function', 'linear(0, 1)')) return GRID_EASE;
+    var p = []; for (var i = 0; i <= 60; i++) { var t = i / 60; p.push((t >= 1 ? 1 : 1 - Math.pow(2, -10 * t)).toFixed(4)); }
+    return 'linear(' + p.join(',') + ')';
+  })();
+  var FROM = 'translateY(100%) rotateX(60deg)', TO = 'translateY(0) rotateX(0deg)';
+  function openHeight() {
+    wrap.classList.add('is-open');
+    var h = wrap.getBoundingClientRect().height;
+    wrap.classList.remove('is-open');
+    return h + 'px';
+  }
+  function lit() { document.documentElement.classList.add('hero-lit'); }
+  function done() { if (window.__aboutTitleRevealed) return; window.__aboutTitleRevealed = true; dispatchEvent(new Event('about:title-revealed')); }
+  function show() {
+    lit();
+    imgs.forEach(function (el) { el.style.transform = 'none'; });
+    if (wrap) wrap.classList.add('is-open');
+    done();
+  }
+  function play() {
+    if (played) return; played = true;
+    lit();
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return show();
+    imgs.forEach(function (el, i) {
+      var a = el.animate([{ transform: FROM }, { transform: TO }], { duration: DUR, delay: i * STAGGER, easing: EASE, fill: 'both' });
+      a.onfinish = function () { el.style.transform = 'none'; a.cancel(); };
+    });
+    if (wrap) {
+      var g = wrap.animate([{ height: '0px' }, { height: openHeight() }], { duration: GRID_DUR, easing: GRID_EASE, fill: 'both' });
+      g.onfinish = function () { wrap.classList.add('is-open'); g.cancel(); };
+    }
+    setTimeout(done, Math.max(0, DUR + Math.max(0, imgs.length - 1) * STAGGER - 800));
+  }
+  addEventListener('basalt3d:title', play, { once: true });
+  if (window.__basaltTitle) play();
+  setTimeout(play, 9000);
+})();
+</script>
+
+
+
+<script>
+// ------------- ABOUT: FLIP CARD START (<= 820px + touch tablets) ------------- //
+
+(function () {
+  if (document.documentElement.classList.contains('w-editor')) return;
+  var CFG = { maxW: 820, from: 50, fromPhone: 45, phoneW: 767, to: 40, over: .5, smooth: .14, tabMin: 600, tabFrom: 31.5, tabTo: 28 };
+  var st = document.querySelector('[data-flip-start]');
+  var hero = document.querySelector('.basalt-hero');
+  var heroTop = hero && hero.querySelector('.hero-top');
+  if (!st || !hero || !heroTop) return;
+  var nav = heroTop.querySelector('.nav');
+  var mq = matchMedia('(max-width: ' + CFG.maxW + 'px)');
+  var phone = matchMedia('(max-width: ' + CFG.phoneW + 'px)');
+  var touch = matchMedia('(hover: none) and (pointer: coarse)');
+  var portrait = matchMedia('(orientation: portrait) and (max-width: 820px), (orientation: portrait) and (hover: none) and (pointer: coarse)');
+  function tablet() { return touch.matches && Math.min(innerWidth, innerHeight) >= CFG.tabMin; }
+  function on() { return mq.matches || tablet(); }
+  function from() { return tablet() ? CFG.tabFrom : phone.matches ? CFG.fromPhone : CFG.from; }
+  function to() { return tablet() ? CFG.tabTo : CFG.to; }
+  function unit() { return tablet() ? 'vmin' : 'vw'; }
+  var cur = from(), raf = 0;
+  function scrollPos() { return window.__scroller ? window.__scroller.scrollTop : (window.scrollY || 0); }
+  function shiftY() { var t = getComputedStyle(heroTop).transform; return t && t !== 'none' ? new DOMMatrixReadOnly(t).m42 : 0; }
+  function navGrow() { return nav && !nav.classList.contains('is-open') ? Math.max(0, nav.scrollHeight - nav.offsetHeight) : 0; }
+  function place() {
+    if (!on()) return;
+    var box = st.offsetParent || st.parentElement;
+    var b = box.getBoundingClientRect(), hr = hero.getBoundingClientRect(), tr = heroTop.getBoundingClientRect();
+    if (portrait.matches) { st.style.top = (hr.top + hr.height / 2 - b.top) + 'px'; return; }
+    st.style.top = ((tr.bottom - shiftY() + navGrow() + Math.min(hr.bottom, hr.top + innerHeight)) / 2 - b.top) + 'px';
+  }
+  function target() {
+    var p = Math.min(1, Math.max(0, scrollPos() / (innerHeight * CFG.over)));
+    p = p * p * (3 - 2 * p);
+    var f = from();
+    return f + (to() - f) * p;
+  }
+  function tick() {
+    raf = 0;
+    if (!on()) return;
+    var t = target();
+    cur += (t - cur) * CFG.smooth;
+    if (Math.abs(t - cur) < .01) cur = t;
+    st.style.width = cur.toFixed(3) + unit();
+    if (cur !== t) raf = requestAnimationFrame(tick);
+  }
+  function wake() { if (!raf && on()) raf = requestAnimationFrame(tick); }
+  function apply() {
+    if (on()) { st.style.maxWidth = 'none'; cur = target(); st.style.width = cur + unit(); place(); }
+    else { st.style.top = ''; st.style.width = ''; st.style.maxWidth = ''; }
+  }
+  apply();
+  document.addEventListener('scroll', wake, { passive: true, capture: true });
+  var rz; addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(apply, 120); });
+  [mq, phone, touch, portrait].forEach(function (m) { m.addEventListener('change', apply); });
+  addEventListener('load', place);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
+  var ro = new ResizeObserver(place); ro.observe(heroTop); ro.observe(hero);
+})();
+</script>
+
+
+
+<script>
+// ------------- ABOUT: SCROLL DOWN ARROWS ------------- //
+
+(function () {
+  if (document.documentElement.classList.contains('w-editor')) return;
+  var el = document.querySelector('.scroll-down-about');
+  if (!el || !window.osply || !matchMedia('(min-width: 992px) and (hover: hover) and (pointer: fine)').matches) return;
+  osply.gsap().then(function () { osply.arrowFx(el); });
+})();
+</script>
